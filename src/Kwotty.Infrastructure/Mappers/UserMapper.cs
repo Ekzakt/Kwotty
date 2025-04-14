@@ -60,7 +60,7 @@ public class UserMapper : IMapper<Models.User, Entities.User>
             Email = domain.Email,
             Firstname = domain.Firstname,
             IsDisabled = domain.IsDisabled,
-            CreateOnUtc = DateTimeOffset.UtcNow, // Set on creation; Domain model lacks this
+            CreatedOnUtc = DateTimeOffset.UtcNow, // Set on creation; Domain model lacks this
             Settings = _settingsMapper.ToNewEntity(domain.Settings),
             // Map Ratings (Requires handling existing Quotes in Service/Repo)
             QuoteRatings = domain.GivenRatings? // Use domain property name
@@ -83,7 +83,7 @@ public class UserMapper : IMapper<Models.User, Entities.User>
         entity.Email = domain.Email;
         entity.Firstname = domain.Firstname;
         entity.IsDisabled = domain.IsDisabled;
-        // Id, CreateOnUtc not updated.
+        // Id, CreatedOnUtc not updated.
         // UserSettings relationship update needs careful handling (usually via UserSettings ApplyUpdate).
         // QuoteRatings collection updates need complex handling (Service/Repo).
     }

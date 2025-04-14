@@ -33,7 +33,7 @@ public class CategoryMapper : IMapper<Models.Category, Entities.Category>
             Name = domain.Name,
             NameSlug = domain.NameSlug,
             IsHidden = domain.IsHidden,
-            CreatedOnUtc = domain.CreateOnUtc, // Domain property name (has typo?)
+            CreatedOnUtc = domain.CreatedOnUtc, // Domain property name (has typo?)
             CreatedBy = domain.CreatedBy
         };
     }

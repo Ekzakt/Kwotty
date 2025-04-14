@@ -31,7 +31,7 @@ namespace Kwotty.Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<DateTimeOffset>("CreateOnUtc")
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
                         .HasColumnType("datetimeoffset");
 
                     b.Property<DateTimeOffset?>("ExpiresOn")
@@ -255,7 +255,7 @@ namespace Kwotty.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<DateTimeOffset>("CreateOnUtc")
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
                         .HasColumnType("datetimeoffset");
 
                     b.Property<string>("Email")

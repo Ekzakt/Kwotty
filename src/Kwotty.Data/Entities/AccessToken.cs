@@ -26,5 +26,5 @@ public class AccessToken
 
 
     [Required]
-    public DateTimeOffset CreateOnUtc { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset CreatedOnUtc { get; set; } = DateTimeOffset.UtcNow;
 }

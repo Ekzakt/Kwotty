@@ -13,7 +13,7 @@ public class Category
 
     public bool IsHidden { get; private set; }
 
-    public DateTimeOffset CreateOnUtc { get; }
+    public DateTimeOffset CreatedOnUtc { get; }
 
     public string? CreatedBy { get; }
 
@@ -24,7 +24,7 @@ public class Category
         Name = name; // Add validation if required
         NameSlug = nameSlug; // Could be generated
         IsHidden = isHidden;
-        CreateOnUtc = createdAt;
+        CreatedOnUtc = createdAt;
         CreatedBy = createdBy;
     }
 

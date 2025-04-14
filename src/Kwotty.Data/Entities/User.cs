@@ -23,7 +23,7 @@ public class User
     public bool IsDisabled { get; set; }
 
     [Required]
-    public DateTimeOffset CreateOnUtc { get; set; }
+    public DateTimeOffset CreatedOnUtc { get; set; }
 
 
     public virtual UserSettings? Settings { get; set; }

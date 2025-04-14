@@ -19,7 +19,7 @@ public class AccessTokenMapper : IMapper<Models.AceessToken, Entities.AccessToke
             // Mapping Persistence.ExpiresOn (nullable DateTimeOffset) to Domain.UsedOnUtc (nullable DateTimeOffset)
             // Verify if this mapping is correct based on your application logic.
             UsedOnUtc = entity.ExpiresOn,
-            CreatedUtc = entity.CreateOnUtc // Map Persistence.CreateOnUtc -> Domain.CreatedUtc
+            CreatedUtc = entity.CreatedOnUtc // Map Persistence.CreatedOnUtc -> Domain.CreatedUtc
         };
     }
 
@@ -39,7 +39,7 @@ public class AccessTokenMapper : IMapper<Models.AceessToken, Entities.AccessToke
             UserId = model.UserId,
             ExpiresOnUtc = model.ExpiresOnUtc,
             ExpiresOn = model.UsedOnUtc, // Mapping Domain.UsedOnUtc -> Persistence.ExpiresOn? Verify.
-            CreateOnUtc = model.CreatedUtc // Map Domain.CreatedUtc -> Persistence.CreateOnUtc
+            CreatedOnUtc = model.CreatedUtc // Map Domain.CreatedUtc -> Persistence.CreatedOnUtc
         };
     }
 
@@ -52,6 +52,6 @@ public class AccessTokenMapper : IMapper<Models.AceessToken, Entities.AccessToke
         entity.UserId = domain.UserId; // Should UserId change? Usually not after creation.
         entity.ExpiresOnUtc = domain.ExpiresOnUtc;
         entity.ExpiresOn = domain.UsedOnUtc; // Verify mapping
-        // Id and CreateOnUtc typically not updated.
+        // Id and CreatedOnUtc typically not updated.
     }
 }

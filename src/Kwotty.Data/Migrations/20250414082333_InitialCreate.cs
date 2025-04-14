@@ -25,7 +25,7 @@ namespace Kwotty.Data.Migrations
                     UserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     ExpiresOnUtc = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
                     ExpiresOn = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
-                    CreateOnUtc = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false)
+                    CreatedOnUtc = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -76,7 +76,7 @@ namespace Kwotty.Data.Migrations
                     Email = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
                     Firstname = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: true),
                     IsDisabled = table.Column<bool>(type: "bit", nullable: false),
-                    CreateOnUtc = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false)
+                    CreatedOnUtc = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false)
                 },
                 constraints: table =>
                 {
