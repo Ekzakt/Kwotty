@@ -11,7 +11,7 @@ public class UserSettings
     public Guid UserId { get; set; }
 
 
-    public bool IsPauzed { get; set; }
+    public bool IsPaused { get; set; }
 
 
     public DateTimeOffset? LastPausedOn { get; set; }

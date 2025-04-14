@@ -18,7 +18,7 @@ public class Rating
     [Required]
     public Guid UserId { get; set; }
 
-
+    
     [Required]
     public byte Value { get; set; }
 

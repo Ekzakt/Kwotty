@@ -21,7 +21,7 @@ public class UserSettingsMapper : IMapper<Models.UserSettings, Entities.UserSett
         var userSettingsModel = new Models.UserSettings(entity.UserId);
 
         // Apply state
-        if (entity.IsPauzed) userSettingsModel.Pause(); else userSettingsModel.Resume(); // Use domain methods
+        if (entity.IsPaused) userSettingsModel.Pause(); else userSettingsModel.Resume(); // Use domain methods
         // Reflect exact timestamps from persistence if they differ from UtcNow in methods
         typeof(Models.UserSettings).GetProperty("LastPausedOnUtc")?.SetValue(userSettingsModel, entity.LastPausedOn); // Map to correct domain property
         typeof(Models.UserSettings).GetProperty("LastResumedOnUtc")?.SetValue(userSettingsModel, entity.LastResumedOn); // Map to correct domain property
@@ -51,7 +51,7 @@ public class UserSettingsMapper : IMapper<Models.UserSettings, Entities.UserSett
         var entity = new Entities.UserSettings
         {
             UserId = domain.UserId, // Must match User.Id
-            IsPauzed = domain.IsPaused, // Map domain name to entity name
+            IsPaused = domain.IsPaused, // Map domain name to entity name
             LastPausedOn = domain.LastPausedOnUtc, // Map domain name to entity name
             LastResumedOn = domain.LastResumedOnUtc, // Map domain name to entity name
             // Map preferred categories -> UserCategory join entities (Complex: Requires Service/Repo)
@@ -67,7 +67,7 @@ public class UserSettingsMapper : IMapper<Models.UserSettings, Entities.UserSett
         ArgumentNullException.ThrowIfNull(domain);
         ArgumentNullException.ThrowIfNull(entity);
 
-        entity.IsPauzed = domain.IsPaused; // Map domain name to entity name
+        entity.IsPaused = domain.IsPaused; // Map domain name to entity name
         entity.LastPausedOn = domain.LastPausedOnUtc; // Map domain name to entity name
         entity.LastResumedOn = domain.LastResumedOnUtc; // Map domain name to entity name
         // UserId not updated.

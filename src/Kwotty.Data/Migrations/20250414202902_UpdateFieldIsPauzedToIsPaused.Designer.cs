@@ -4,6 +4,7 @@ using Kwotty.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Kwotty.Data.Migrations
 {
     [DbContext(typeof(KwottyDbContext))]
-    partial class KwottyDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250414202902_UpdateFieldIsPauzedToIsPaused")]
+    partial class UpdateFieldIsPauzedToIsPaused
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

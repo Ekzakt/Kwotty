@@ -1,0 +1,4062 @@
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Data\Constants.cs
+
+namespace Kwotty.Data;
+
+public static class Constants
+{
+    public const string KwottySchema = "kwotty";
+
+    public const string KwottyConnectionString = "KwottyConnectionString";
+
+    public const string MigrationsHistoryTableName = "__EfMigrationsHistory";
+
+    public const string ErrorPagePath = "/error";
+}
+
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Data\Constants.cs
+
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Data\KwottyDbContext.cs
+
+using Kwotty.Data.Entities;
+using Microsoft.EntityFrameworkCore;
+
+namespace Kwotty.Data;
+
+public class KwottyDbContext : DbContext
+{
+    public DbSet<AccessToken> AccessTokens { get; set; }
+    public DbSet<Author> Authors { get; set; }
+    public DbSet<Category> Categories { get; set; }
+    public DbSet<Medium> Media { get; set; }
+    public DbSet<Quote> Quotes { get; set; }
+    public DbSet<QuoteItem> QuoteItems { get; set; }
+    public DbSet<QuoteCategory> QuotesCategories { get; set; }
+    public DbSet<Rating> Ratings { get; set; }
+    public DbSet<User> Users { get; set; }
+    public DbSet<UserCategory> UsersCategories { get; set; }
+    public DbSet<UserSettings> UserSettings { get; set; }
+
+
+    public KwottyDbContext(DbContextOptions<KwottyDbContext> options) : base(options)
+    {
+    }
+
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+
+        modelBuilder.HasDefaultSchema(Constants.KwottySchema);
+
+        // Configure Composite Primary Keys for Join Tables
+
+        modelBuilder.Entity<UserCategory>()
+            .HasKey(uc => new { uc.UserId, uc.CategoryId });
+
+        modelBuilder.Entity<UserCategory>()
+            .HasOne(uc => uc.UserSettings)
+            .WithMany(us => us.UserCategories)
+            .HasForeignKey(uc => uc.UserId);
+
+        modelBuilder.Entity<UserCategory>()
+            .HasOne(uc => uc.Category)
+            .WithMany(c => c.UserCategories)
+            .HasForeignKey(uc => uc.CategoryId);
+
+
+        modelBuilder.Entity<QuoteCategory>()
+            .HasKey(qc => new { qc.QuoteId, qc.CategoryId });
+
+        modelBuilder.Entity<QuoteCategory>()
+            .HasOne(qc => qc.Quote)
+            .WithMany(q => q.QuoteCategories)
+            .HasForeignKey(qc => qc.QuoteId);
+
+        modelBuilder.Entity<QuoteCategory>()
+            .HasOne(qc => qc.Category)
+            .WithMany(c => c.QuoteCategories)
+            .HasForeignKey(qc => qc.CategoryId);
+
+
+        modelBuilder.Entity<Rating>()
+            .HasKey(qr => new { qr.QuoteId, qr.UserId });
+
+        modelBuilder.Entity<Rating>()
+            .HasOne(qr => qr.Quote)
+            .WithMany(q => q.QuoteRatings)
+            .HasForeignKey(qr => qr.QuoteId);
+
+        modelBuilder.Entity<Rating>()
+            .HasOne(qr => qr.User)
+            .WithMany(u => u.QuoteRatings)
+            .HasForeignKey(qr => qr.UserId);
+
+
+        // Configure One-to-One relationship between User and UserSettings
+
+        modelBuilder.Entity<User>()
+            .HasOne(u => u.Settings)
+            .WithOne(us => us.User)
+            .HasForeignKey<UserSettings>(us => us.UserId);
+
+    }
+}
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Data\KwottyDbContext.cs
+
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Web\Program.cs
+
+using Kwotty.Data;
+using Kwotty.Data.Configuration;
+using Kwotty.Web.EndPoints.Authentication;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddRazorPages();
+builder.Services.AddSwaggerGen();
+builder.Services.AddDatabase(builder.Configuration);
+
+var app = builder.Build();
+
+if (!app.Environment.IsDevelopment())
+{
+    app.UseExceptionHandler(Constants.ErrorPagePath);
+    app.UseHsts();
+}
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+app.MapAuthenticationEndpoints();
+
+app.UseHttpsRedirection();
+
+app.UseRouting();
+
+app.UseAuthorization();
+
+app.MapStaticAssets();
+app.MapRazorPages()
+   .WithStaticAssets();
+
+app.Run();
+
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Web\Program.cs
+
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Application\Contracts\IGenericRepo.cs
+
+using System.Linq.Expressions;
+
+namespace Kwotty.Application.Contracts;
+
+/// <summary>
+/// Defines generic repository operations for domain entities.
+/// </summary>
+/// <typeparam name="TDomain">The domain model type this repository works with.</typeparam>
+/// <typeparam name="TId">The type of the entity's identifier.</typeparam>
+public interface IGenericRepo<TDomain, TId> where TDomain : class
+{
+    /// <summary>
+    /// Gets a domain entity by its identifier asynchronously.
+    /// Implementations should consider including necessary related data.
+    /// </summary>
+    /// <param name="id">The identifier.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The domain entity or null if not found.</returns>
+    Task<TDomain?> GetByIdAsync(TId id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets all domain entities asynchronously.
+    /// Implementations should consider performance for large datasets.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A list of all domain entities.</returns>
+    Task<List<TDomain>> GetAllAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Finds domain entities based on a predicate asynchronously.
+    /// WARNING: Direct translation of domain predicates to efficient database queries can be complex.
+    /// Consider specific repository methods or Specification pattern for optimized queries.
+    /// </summary>
+    /// <param name="predicate">The search predicate based on the DOMAIN model.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A list of matching domain entities.</returns>
+    Task<List<TDomain>> FindAsync(Expression<Func<TDomain, bool>> predicate, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Adds a new domain entity asynchronously.
+    /// </summary>
+    /// <param name="domainEntity">The domain entity to add.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The added domain entity (potentially with updated state like generated IDs if mapping handles it).</returns>
+    Task<TDomain> AddAsync(TDomain domainEntity, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Updates an existing domain entity asynchronously.
+    /// </summary>
+    /// <param name="domainEntity">The domain entity with updated state. Must have its identifier set.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Task representing the asynchronous operation.</returns>
+    Task UpdateAsync(TDomain domainEntity, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Deletes a domain entity by its identifier asynchronously.
+    /// </summary>
+    /// <param name="id">The identifier of the entity to delete.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Task representing the asynchronous operation.</returns>
+    Task DeleteAsync(TId id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Checks if an entity with the given identifier exists.
+    /// </summary>
+    /// <param name="id">The identifier.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>True if the entity exists, false otherwise.</returns>
+    Task<bool> ExistsAsync(TId id, CancellationToken cancellationToken = default);
+}
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Application\Contracts\IGenericRepo.cs
+
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Application\Contracts\IMapper.cs
+
+namespace Kwotty.Application.Contracts;
+
+/// <summary>
+/// Defines a contract for mapping between Domain models and Persistence entities.
+/// </summary>
+/// <typeparam name="TModel">The Domain model type.</typeparam>
+/// <typeparam name="TEntity">The Persistence entity type.</typeparam>
+public interface IMapper<TModel, TEntity>
+    where TModel : class
+    where TEntity : class
+{
+    /// <summary>
+    /// Maps a Persistence entity to a Domain model.
+    /// </summary>
+    /// <param name="entity">The persistence entity.</param>
+    /// <returns>The corresponding domain model, or null if the entity was null.</returns>
+    TModel? ToModel(TEntity? entity);
+
+    /// <summary>
+    /// Maps a collection of Persistence entities to a collection of Domain models.
+    /// </summary>
+    /// <param name="entities">The collection of persistence entities.</param>
+    /// <returns>An IEnumerable of corresponding domain models.</returns>
+    IEnumerable<TModel> ToModelList(IEnumerable<TEntity>? entities);
+
+    /// <summary>
+    /// Maps a Domain model to a **new** Persistence entity.
+    /// Note: Use this primarily for creating new records. Updating existing
+    /// entities often requires fetching the tracked entity first and then
+    /// applying changes from the domain model.
+    /// </summary>
+    /// <param name="domain">The domain model.</param>
+    /// <returns>A new persistence entity, or null if the domain model was null.</returns>
+    TEntity? ToNewEntity(TModel? model);
+
+    /// <summary>
+    /// Applies changes from a Domain model onto an existing, tracked Persistence entity.
+    /// This is typically used for updates. Implementations should handle mapping properties
+    /// and potentially complex relationship updates.
+    /// </summary>
+    /// <param name="domain">The domain model containing updated state.</param>
+    /// <param name="entity">The existing persistence entity (tracked by DbContext).</param>
+    void ApplyUpdate(TModel model, TEntity entity);
+}
+
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Application\Contracts\IMapper.cs
+
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Data\Configuration\DependencyInjection.cs
+
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace Kwotty.Data.Configuration;
+
+public static class DependencyInjection
+{
+    public static IServiceCollection AddDatabase(this IServiceCollection services, IConfiguration configuration)
+    {
+        var connectionString = configuration.GetConnectionString(Constants.KwottyConnectionString);
+
+        services.AddDbContextFactory<KwottyDbContext>(options =>
+        {
+            options.UseSqlServer(connectionString, sqlServerOptions =>
+            {
+                sqlServerOptions.MigrationsHistoryTable(Constants.MigrationsHistoryTableName, Constants.KwottySchema);
+                sqlServerOptions.EnableRetryOnFailure(3);
+            });
+        });
+
+        return services;
+    }
+}
+
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Data\Configuration\DependencyInjection.cs
+
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Data\Entities\AccessToken.cs
+
+using System.ComponentModel.DataAnnotations;
+
+namespace Kwotty.Data.Entities;
+
+
+public class AccessToken
+{
+    [Key]
+    public int Id { get; set; }
+
+
+    [Required]
+    [StringLength(128)]
+    public string TokenValue { get; set; } = string.Empty;
+
+
+    [Required]
+    public Guid UserId { get; set; }
+
+
+    [Required]
+    public DateTimeOffset ExpiresOnUtc { get; set; }
+
+
+    public DateTimeOffset? ExpiresOn { get; set; }
+
+
+    [Required]
+    public DateTimeOffset CreatedOnUtc { get; set; } = DateTimeOffset.UtcNow;
+}
+
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Data\Entities\AccessToken.cs
+
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Data\Entities\Author.cs
+
+using System.ComponentModel.DataAnnotations.Schema;
+using System.ComponentModel.DataAnnotations;
+
+namespace Kwotty.Data.Entities;
+
+
+[Table("Authors")]
+public class Author
+{
+    [Key]
+    public Guid Id { get; set; }
+
+
+    [Required]
+    [StringLength(256)]
+    public string Name { get; set; } = string.Empty;
+
+
+    [Required]
+    [StringLength(256)]
+    public string? Slug { get; set; }
+
+
+    public Guid? MediumId { get; set; }
+
+
+    public bool IsHidden { get; set; }
+
+
+    [Required]
+    public  DateTimeOffset CreatedOnUtc { get; set; }
+
+
+    [StringLength(256)]
+    public string? CreatedBy { get; set; }
+
+
+    [ForeignKey(nameof(MediumId))]
+    public virtual Medium? Medium { get; set; }
+
+
+    public virtual ICollection<Quote> Quotes { get; set; } = new HashSet<Quote>();
+}
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Data\Entities\Author.cs
+
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Data\Entities\Category.cs
+
+using System.ComponentModel.DataAnnotations.Schema;
+using System.ComponentModel.DataAnnotations;
+
+namespace Kwotty.Data.Entities;
+
+
+[Table("Categories")]
+public class Category
+{
+    [Key]
+    public Guid Id { get; set; }
+
+
+    [Required]
+    [StringLength(256)]
+    public string Name { get; set; } = string.Empty;
+
+
+    [StringLength(256)]
+    [Column(TypeName = "nvarchar(256)")]
+    public string? NameSlug { get; set; }
+
+
+    public bool IsHidden { get; set; }
+
+
+    [Required]
+    public DateTimeOffset CreatedOnUtc { get; set; }
+
+
+    [StringLength(256)]
+    public string? CreatedBy { get; set; }
+
+
+    public virtual ICollection<UserCategory> UserCategories { get; set; } = new HashSet<UserCategory>();
+
+
+    public virtual ICollection<QuoteCategory> QuoteCategories { get; set; } = new HashSet<QuoteCategory>();
+}
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Data\Entities\Category.cs
+
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Data\Entities\Medium.cs
+
+using System.ComponentModel.DataAnnotations.Schema;
+using System.ComponentModel.DataAnnotations;
+
+namespace Kwotty.Data.Entities;
+
+
+[Table("Media")]
+public class Medium
+{
+    [Key]
+    public Guid Id { get; set; }
+
+
+    [StringLength(1024)]
+    public string? BaseUrl { get; set; }
+
+
+    [StringLength(128)]
+    public string? FileName { get; set; }
+
+
+    [StringLength(1152)]
+    public string? CompleteUrl { get; set; }
+
+
+    public bool IsHidden { get; set; }
+
+     
+    public DateTimeOffset CreatedOnUtc { get; set; }
+
+
+    [StringLength(256)]
+    public string? CreatedBy { get; set; }
+
+
+    public virtual ICollection<Author> Authors { get; set; } = new HashSet<Author>();
+
+
+    public virtual ICollection<QuoteItem> QuoteItems { get; set; } = new HashSet<QuoteItem>();
+}
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Data\Entities\Medium.cs
+
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Data\Entities\Quote.cs
+
+using System.ComponentModel.DataAnnotations.Schema;
+using System.ComponentModel.DataAnnotations;
+
+namespace Kwotty.Data.Entities;
+
+
+[Table("Quotes")]
+public class Quote
+{
+    [Key]
+    public Guid Id { get; set; }
+
+
+    public bool IsHidden { get; set; }
+
+
+    [Required]
+    public Guid AuthorId { get; set; }
+
+    [Required]
+    public DateTimeOffset CreatedOnUtc { get; set; }
+
+
+    [StringLength(256)]
+    public string? CreatedBy { get; set; }
+
+
+    [ForeignKey(nameof(AuthorId))]
+    public virtual Author? Author { get; set; }
+
+
+    public virtual ICollection<QuoteItem> QuoteItems { get; set; } = new HashSet<QuoteItem>();
+
+
+    public virtual ICollection<QuoteCategory> QuoteCategories { get; set; } = new HashSet<QuoteCategory>();
+
+
+    public virtual ICollection<Rating> QuoteRatings { get; set; } = new HashSet<Rating>();
+}
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Data\Entities\Quote.cs
+
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Data\Entities\QuoteItem.cs
+
+using System.ComponentModel.DataAnnotations.Schema;
+using System.ComponentModel.DataAnnotations;
+
+namespace Kwotty.Data.Entities;
+
+
+[Table("QuoteItems")]
+public class QuoteItem
+{
+    [Key]
+    public Guid Id { get; set; }
+
+    [Required]
+    public Guid QuoteId { get; set; }
+
+
+    [Required]
+    [Column(TypeName = "nvarchar(MAX)")]
+    public string? Text { get; set; }
+
+
+    [Required]
+    [Column(TypeName = "nvarchar(MAX)")]
+    public string? TextSlug { get; set; }
+
+
+    public Guid? MediumId { get; set; }
+
+
+    public int SortNumber { get; set; }
+
+
+    [ForeignKey(nameof(QuoteId))]
+    public virtual Quote? Quote { get; set; }
+
+
+    [ForeignKey(nameof(MediumId))]
+    public virtual Medium? Medium { get; set; }
+}
+
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Data\Entities\QuoteItem.cs
+
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Data\Entities\QuotesCategories.cs
+
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
+namespace Kwotty.Data.Entities;
+
+
+[Table("QuotesCategories")]
+public class QuoteCategory
+{
+    [Required]
+    public Guid QuoteId { get; set; }
+
+
+    [Required]
+    public Guid CategoryId { get; set; }
+
+
+    [ForeignKey(nameof(QuoteId))]
+    public virtual Quote? Quote { get; set; }
+
+
+    [ForeignKey(nameof(CategoryId))]
+    public virtual Category? Category { get; set; }
+}
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Data\Entities\QuotesCategories.cs
+
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Data\Entities\Rating.cs
+
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
+namespace Kwotty.Data.Entities;
+
+
+[Table("Ratings")]
+public class Rating
+{
+    [Key]
+    public long Id { get; set; }
+
+
+    [Required]
+    public Guid QuoteId { get; set; }
+
+
+    [Required]
+    public Guid UserId { get; set; }
+
+
+    [Required]
+    public byte Value { get; set; }
+
+
+    public DateTimeOffset RatedOnUtc  { get; set; }
+
+
+    [ForeignKey(nameof(QuoteId))]
+    public virtual Quote? Quote { get; set; }
+
+
+    [ForeignKey(nameof(UserId))]
+    public virtual User? User { get; set; }
+}
+
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Data\Entities\Rating.cs
+
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Data\Entities\User.cs
+
+using System.ComponentModel.DataAnnotations.Schema;
+using System.ComponentModel.DataAnnotations;
+
+namespace Kwotty.Data.Entities;
+
+
+[Table("Users")]
+public class User
+{
+    [Key]
+    public Guid Id { get; set; }
+
+
+    [StringLength(256)]
+    [EmailAddress]
+    public string? Email { get; set; }
+
+
+    [StringLength(64)]
+    public string? Firstname { get; set; }
+
+
+    public bool IsDisabled { get; set; }
+
+    [Required]
+    public DateTimeOffset CreatedOnUtc { get; set; }
+
+
+    public virtual UserSettings? Settings { get; set; }
+
+
+    public virtual ICollection<Rating> QuoteRatings { get; set; } = new HashSet<Rating>();
+}
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Data\Entities\User.cs
+
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Data\Entities\UserCategory.cs
+
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
+namespace Kwotty.Data.Entities;
+
+
+[Table("UsersCategories")]
+public class UserCategory
+{
+    [Required]
+    public Guid UserId { get; set; }
+
+    [Required]
+    public Guid CategoryId { get; set; }
+
+
+    [ForeignKey(nameof(UserId))]
+    public virtual UserSettings? UserSettings { get; set; }
+
+
+    [ForeignKey(nameof(CategoryId))]
+    public virtual Category? Category { get; set; }
+}
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Data\Entities\UserCategory.cs
+
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Data\Entities\UserSettings.cs
+
+using System.ComponentModel.DataAnnotations.Schema;
+using System.ComponentModel.DataAnnotations;
+
+namespace Kwotty.Data.Entities;
+
+
+[Table("UserSettings")]
+public class UserSettings
+{
+    [Key]
+    public Guid UserId { get; set; }
+
+
+    public bool IsPaused { get; set; }
+
+
+    public DateTimeOffset? LastPausedOn { get; set; }
+
+
+    public DateTimeOffset? LastResumedOn { get; set; }
+
+
+    public virtual User? User { get; set; }
+
+
+    public virtual ICollection<UserCategory> UserCategories { get; set; } = new HashSet<UserCategory>();
+}
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Data\Entities\UserSettings.cs
+
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Data\Migrations\20250414202352_InitialCreate.cs
+
+using System;
+using Microsoft.EntityFrameworkCore.Migrations;
+
+#nullable disable
+
+namespace Kwotty.Data.Migrations
+{
+    /// <inheritdoc />
+    public partial class InitialCreate : Migration
+    {
+        /// <inheritdoc />
+        protected override void Up(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.EnsureSchema(
+                name: "kwotty");
+
+            migrationBuilder.CreateTable(
+                name: "AccessTokens",
+                schema: "kwotty",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    TokenValue = table.Column<string>(type: "nvarchar(128)", maxLength: 128, nullable: false),
+                    UserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    ExpiresOnUtc = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
+                    ExpiresOn = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
+                    CreatedOnUtc = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_AccessTokens", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Categories",
+                schema: "kwotty",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    Name = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: false),
+                    NameSlug = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
+                    IsHidden = table.Column<bool>(type: "bit", nullable: false),
+                    CreatedOnUtc = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
+                    CreatedBy = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Categories", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Media",
+                schema: "kwotty",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    BaseUrl = table.Column<string>(type: "nvarchar(1024)", maxLength: 1024, nullable: true),
+                    FileName = table.Column<string>(type: "nvarchar(128)", maxLength: 128, nullable: true),
+                    CompleteUrl = table.Column<string>(type: "nvarchar(1152)", maxLength: 1152, nullable: true),
+                    IsHidden = table.Column<bool>(type: "bit", nullable: false),
+                    CreatedOnUtc = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
+                    CreatedBy = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Media", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Users",
+                schema: "kwotty",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    Email = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
+                    Firstname = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: true),
+                    IsDisabled = table.Column<bool>(type: "bit", nullable: false),
+                    CreatedOnUtc = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Users", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Authors",
+                schema: "kwotty",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    Name = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: false),
+                    Slug = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: false),
+                    MediumId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
+                    IsHidden = table.Column<bool>(type: "bit", nullable: false),
+                    CreatedOnUtc = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
+                    CreatedBy = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Authors", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Authors_Media_MediumId",
+                        column: x => x.MediumId,
+                        principalSchema: "kwotty",
+                        principalTable: "Media",
+                        principalColumn: "Id");
+                });
+
+            migrationBuilder.CreateTable(
+                name: "UserSettings",
+                schema: "kwotty",
+                columns: table => new
+                {
+                    UserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    IsPauzed = table.Column<bool>(type: "bit", nullable: false),
+                    LastPausedOn = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
+                    LastResumedOn = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_UserSettings", x => x.UserId);
+                    table.ForeignKey(
+                        name: "FK_UserSettings_Users_UserId",
+                        column: x => x.UserId,
+                        principalSchema: "kwotty",
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Quotes",
+                schema: "kwotty",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    IsHidden = table.Column<bool>(type: "bit", nullable: false),
+                    AuthorId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    CreatedOnUtc = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
+                    CreatedBy = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Quotes", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Quotes_Authors_AuthorId",
+                        column: x => x.AuthorId,
+                        principalSchema: "kwotty",
+                        principalTable: "Authors",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "UsersCategories",
+                schema: "kwotty",
+                columns: table => new
+                {
+                    UserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    CategoryId = table.Column<Guid>(type: "uniqueidentifier", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_UsersCategories", x => new { x.UserId, x.CategoryId });
+                    table.ForeignKey(
+                        name: "FK_UsersCategories_Categories_CategoryId",
+                        column: x => x.CategoryId,
+                        principalSchema: "kwotty",
+                        principalTable: "Categories",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_UsersCategories_UserSettings_UserId",
+                        column: x => x.UserId,
+                        principalSchema: "kwotty",
+                        principalTable: "UserSettings",
+                        principalColumn: "UserId",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "QuoteItems",
+                schema: "kwotty",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    QuoteId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    Text = table.Column<string>(type: "nvarchar(MAX)", nullable: false),
+                    TextSlug = table.Column<string>(type: "nvarchar(MAX)", nullable: false),
+                    MediumId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
+                    SortNumber = table.Column<int>(type: "int", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_QuoteItems", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_QuoteItems_Media_MediumId",
+                        column: x => x.MediumId,
+                        principalSchema: "kwotty",
+                        principalTable: "Media",
+                        principalColumn: "Id");
+                    table.ForeignKey(
+                        name: "FK_QuoteItems_Quotes_QuoteId",
+                        column: x => x.QuoteId,
+                        principalSchema: "kwotty",
+                        principalTable: "Quotes",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "QuotesCategories",
+                schema: "kwotty",
+                columns: table => new
+                {
+                    QuoteId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    CategoryId = table.Column<Guid>(type: "uniqueidentifier", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_QuotesCategories", x => new { x.QuoteId, x.CategoryId });
+                    table.ForeignKey(
+                        name: "FK_QuotesCategories_Categories_CategoryId",
+                        column: x => x.CategoryId,
+                        principalSchema: "kwotty",
+                        principalTable: "Categories",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_QuotesCategories_Quotes_QuoteId",
+                        column: x => x.QuoteId,
+                        principalSchema: "kwotty",
+                        principalTable: "Quotes",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Ratings",
+                schema: "kwotty",
+                columns: table => new
+                {
+                    QuoteId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    UserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    Id = table.Column<long>(type: "bigint", nullable: false),
+                    Value = table.Column<byte>(type: "tinyint", nullable: false),
+                    RatedOnUtc = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Ratings", x => new { x.QuoteId, x.UserId });
+                    table.ForeignKey(
+                        name: "FK_Ratings_Quotes_QuoteId",
+                        column: x => x.QuoteId,
+                        principalSchema: "kwotty",
+                        principalTable: "Quotes",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_Ratings_Users_UserId",
+                        column: x => x.UserId,
+                        principalSchema: "kwotty",
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Authors_MediumId",
+                schema: "kwotty",
+                table: "Authors",
+                column: "MediumId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_QuoteItems_MediumId",
+                schema: "kwotty",
+                table: "QuoteItems",
+                column: "MediumId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_QuoteItems_QuoteId",
+                schema: "kwotty",
+                table: "QuoteItems",
+                column: "QuoteId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Quotes_AuthorId",
+                schema: "kwotty",
+                table: "Quotes",
+                column: "AuthorId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_QuotesCategories_CategoryId",
+                schema: "kwotty",
+                table: "QuotesCategories",
+                column: "CategoryId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Ratings_UserId",
+                schema: "kwotty",
+                table: "Ratings",
+                column: "UserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_UsersCategories_CategoryId",
+                schema: "kwotty",
+                table: "UsersCategories",
+                column: "CategoryId");
+        }
+
+        /// <inheritdoc />
+        protected override void Down(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.DropTable(
+                name: "AccessTokens",
+                schema: "kwotty");
+
+            migrationBuilder.DropTable(
+                name: "QuoteItems",
+                schema: "kwotty");
+
+            migrationBuilder.DropTable(
+                name: "QuotesCategories",
+                schema: "kwotty");
+
+            migrationBuilder.DropTable(
+                name: "Ratings",
+                schema: "kwotty");
+
+            migrationBuilder.DropTable(
+                name: "UsersCategories",
+                schema: "kwotty");
+
+            migrationBuilder.DropTable(
+                name: "Quotes",
+                schema: "kwotty");
+
+            migrationBuilder.DropTable(
+                name: "Categories",
+                schema: "kwotty");
+
+            migrationBuilder.DropTable(
+                name: "UserSettings",
+                schema: "kwotty");
+
+            migrationBuilder.DropTable(
+                name: "Authors",
+                schema: "kwotty");
+
+            migrationBuilder.DropTable(
+                name: "Users",
+                schema: "kwotty");
+
+            migrationBuilder.DropTable(
+                name: "Media",
+                schema: "kwotty");
+        }
+    }
+}
+
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Data\Migrations\20250414202352_InitialCreate.cs
+
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Data\Migrations\20250414202352_InitialCreate.Designer.cs
+
+// <auto-generated />
+using System;
+using Kwotty.Data;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+
+#nullable disable
+
+namespace Kwotty.Data.Migrations
+{
+    [DbContext(typeof(KwottyDbContext))]
+    [Migration("20250414202352_InitialCreate")]
+    partial class InitialCreate
+    {
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
+        {
+#pragma warning disable 612, 618
+            modelBuilder
+                .HasDefaultSchema("kwotty")
+                .HasAnnotation("ProductVersion", "9.0.4")
+                .HasAnnotation("Relational:MaxIdentifierLength", 128);
+
+            SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
+
+            modelBuilder.Entity("Kwotty.Data.Entities.AccessToken", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("ExpiresOn")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("ExpiresOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("TokenValue")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("AccessTokens", "kwotty");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.Author", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("IsHidden")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid?>("MediumId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MediumId");
+
+                    b.ToTable("Authors", "kwotty");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.Category", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("IsHidden")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("NameSlug")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Categories", "kwotty");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.Medium", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("BaseUrl")
+                        .HasMaxLength(1024)
+                        .HasColumnType("nvarchar(1024)");
+
+                    b.Property<string>("CompleteUrl")
+                        .HasMaxLength(1152)
+                        .HasColumnType("nvarchar(1152)");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("FileName")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<bool>("IsHidden")
+                        .HasColumnType("bit");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Media", "kwotty");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.Quote", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("AuthorId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("IsHidden")
+                        .HasColumnType("bit");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AuthorId");
+
+                    b.ToTable("Quotes", "kwotty");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.QuoteCategory", b =>
+                {
+                    b.Property<Guid>("QuoteId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("CategoryId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("QuoteId", "CategoryId");
+
+                    b.HasIndex("CategoryId");
+
+                    b.ToTable("QuotesCategories", "kwotty");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.QuoteItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("MediumId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("QuoteId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("SortNumber")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(MAX)");
+
+                    b.Property<string>("TextSlug")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(MAX)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MediumId");
+
+                    b.HasIndex("QuoteId");
+
+                    b.ToTable("QuoteItems", "kwotty");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.Rating", b =>
+                {
+                    b.Property<Guid>("QuoteId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<long>("Id")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("RatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<byte>("Value")
+                        .HasColumnType("tinyint");
+
+                    b.HasKey("QuoteId", "UserId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("Ratings", "kwotty");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.User", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("Firstname")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<bool>("IsDisabled")
+                        .HasColumnType("bit");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Users", "kwotty");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.UserCategory", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("CategoryId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("UserId", "CategoryId");
+
+                    b.HasIndex("CategoryId");
+
+                    b.ToTable("UsersCategories", "kwotty");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.UserSettings", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsPauzed")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTimeOffset?>("LastPausedOn")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("LastResumedOn")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("UserSettings", "kwotty");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.Author", b =>
+                {
+                    b.HasOne("Kwotty.Data.Entities.Medium", "Medium")
+                        .WithMany("Authors")
+                        .HasForeignKey("MediumId");
+
+                    b.Navigation("Medium");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.Quote", b =>
+                {
+                    b.HasOne("Kwotty.Data.Entities.Author", "Author")
+                        .WithMany("Quotes")
+                        .HasForeignKey("AuthorId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Author");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.QuoteCategory", b =>
+                {
+                    b.HasOne("Kwotty.Data.Entities.Category", "Category")
+                        .WithMany("QuoteCategories")
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Kwotty.Data.Entities.Quote", "Quote")
+                        .WithMany("QuoteCategories")
+                        .HasForeignKey("QuoteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Category");
+
+                    b.Navigation("Quote");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.QuoteItem", b =>
+                {
+                    b.HasOne("Kwotty.Data.Entities.Medium", "Medium")
+                        .WithMany("QuoteItems")
+                        .HasForeignKey("MediumId");
+
+                    b.HasOne("Kwotty.Data.Entities.Quote", "Quote")
+                        .WithMany("QuoteItems")
+                        .HasForeignKey("QuoteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Medium");
+
+                    b.Navigation("Quote");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.Rating", b =>
+                {
+                    b.HasOne("Kwotty.Data.Entities.Quote", "Quote")
+                        .WithMany("QuoteRatings")
+                        .HasForeignKey("QuoteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Kwotty.Data.Entities.User", "User")
+                        .WithMany("QuoteRatings")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Quote");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.UserCategory", b =>
+                {
+                    b.HasOne("Kwotty.Data.Entities.Category", "Category")
+                        .WithMany("UserCategories")
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Kwotty.Data.Entities.UserSettings", "UserSettings")
+                        .WithMany("UserCategories")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Category");
+
+                    b.Navigation("UserSettings");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.UserSettings", b =>
+                {
+                    b.HasOne("Kwotty.Data.Entities.User", "User")
+                        .WithOne("Settings")
+                        .HasForeignKey("Kwotty.Data.Entities.UserSettings", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.Author", b =>
+                {
+                    b.Navigation("Quotes");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.Category", b =>
+                {
+                    b.Navigation("QuoteCategories");
+
+                    b.Navigation("UserCategories");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.Medium", b =>
+                {
+                    b.Navigation("Authors");
+
+                    b.Navigation("QuoteItems");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.Quote", b =>
+                {
+                    b.Navigation("QuoteCategories");
+
+                    b.Navigation("QuoteItems");
+
+                    b.Navigation("QuoteRatings");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.User", b =>
+                {
+                    b.Navigation("QuoteRatings");
+
+                    b.Navigation("Settings");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.UserSettings", b =>
+                {
+                    b.Navigation("UserCategories");
+                });
+#pragma warning restore 612, 618
+        }
+    }
+}
+
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Data\Migrations\20250414202352_InitialCreate.Designer.cs
+
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Data\Migrations\20250414202902_UpdateFieldIsPauzedToIsPaused.cs
+
+using Microsoft.EntityFrameworkCore.Migrations;
+
+#nullable disable
+
+namespace Kwotty.Data.Migrations
+{
+    /// <inheritdoc />
+    public partial class UpdateFieldIsPauzedToIsPaused : Migration
+    {
+        /// <inheritdoc />
+        protected override void Up(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.RenameColumn(
+                name: "IsPauzed",
+                schema: "kwotty",
+                table: "UserSettings",
+                newName: "IsPaused");
+        }
+
+        /// <inheritdoc />
+        protected override void Down(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.RenameColumn(
+                name: "IsPaused",
+                schema: "kwotty",
+                table: "UserSettings",
+                newName: "IsPauzed");
+        }
+    }
+}
+
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Data\Migrations\20250414202902_UpdateFieldIsPauzedToIsPaused.cs
+
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Data\Migrations\20250414202902_UpdateFieldIsPauzedToIsPaused.Designer.cs
+
+// <auto-generated />
+using System;
+using Kwotty.Data;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+
+#nullable disable
+
+namespace Kwotty.Data.Migrations
+{
+    [DbContext(typeof(KwottyDbContext))]
+    [Migration("20250414202902_UpdateFieldIsPauzedToIsPaused")]
+    partial class UpdateFieldIsPauzedToIsPaused
+    {
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
+        {
+#pragma warning disable 612, 618
+            modelBuilder
+                .HasDefaultSchema("kwotty")
+                .HasAnnotation("ProductVersion", "9.0.4")
+                .HasAnnotation("Relational:MaxIdentifierLength", 128);
+
+            SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
+
+            modelBuilder.Entity("Kwotty.Data.Entities.AccessToken", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("ExpiresOn")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("ExpiresOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("TokenValue")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("AccessTokens", "kwotty");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.Author", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("IsHidden")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid?>("MediumId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MediumId");
+
+                    b.ToTable("Authors", "kwotty");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.Category", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("IsHidden")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("NameSlug")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Categories", "kwotty");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.Medium", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("BaseUrl")
+                        .HasMaxLength(1024)
+                        .HasColumnType("nvarchar(1024)");
+
+                    b.Property<string>("CompleteUrl")
+                        .HasMaxLength(1152)
+                        .HasColumnType("nvarchar(1152)");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("FileName")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<bool>("IsHidden")
+                        .HasColumnType("bit");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Media", "kwotty");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.Quote", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("AuthorId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("IsHidden")
+                        .HasColumnType("bit");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AuthorId");
+
+                    b.ToTable("Quotes", "kwotty");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.QuoteCategory", b =>
+                {
+                    b.Property<Guid>("QuoteId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("CategoryId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("QuoteId", "CategoryId");
+
+                    b.HasIndex("CategoryId");
+
+                    b.ToTable("QuotesCategories", "kwotty");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.QuoteItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("MediumId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("QuoteId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("SortNumber")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(MAX)");
+
+                    b.Property<string>("TextSlug")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(MAX)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MediumId");
+
+                    b.HasIndex("QuoteId");
+
+                    b.ToTable("QuoteItems", "kwotty");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.Rating", b =>
+                {
+                    b.Property<Guid>("QuoteId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<long>("Id")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("RatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<byte>("Value")
+                        .HasColumnType("tinyint");
+
+                    b.HasKey("QuoteId", "UserId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("Ratings", "kwotty");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.User", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("Firstname")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<bool>("IsDisabled")
+                        .HasColumnType("bit");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Users", "kwotty");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.UserCategory", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("CategoryId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("UserId", "CategoryId");
+
+                    b.HasIndex("CategoryId");
+
+                    b.ToTable("UsersCategories", "kwotty");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.UserSettings", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsPaused")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTimeOffset?>("LastPausedOn")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("LastResumedOn")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("UserSettings", "kwotty");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.Author", b =>
+                {
+                    b.HasOne("Kwotty.Data.Entities.Medium", "Medium")
+                        .WithMany("Authors")
+                        .HasForeignKey("MediumId");
+
+                    b.Navigation("Medium");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.Quote", b =>
+                {
+                    b.HasOne("Kwotty.Data.Entities.Author", "Author")
+                        .WithMany("Quotes")
+                        .HasForeignKey("AuthorId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Author");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.QuoteCategory", b =>
+                {
+                    b.HasOne("Kwotty.Data.Entities.Category", "Category")
+                        .WithMany("QuoteCategories")
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Kwotty.Data.Entities.Quote", "Quote")
+                        .WithMany("QuoteCategories")
+                        .HasForeignKey("QuoteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Category");
+
+                    b.Navigation("Quote");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.QuoteItem", b =>
+                {
+                    b.HasOne("Kwotty.Data.Entities.Medium", "Medium")
+                        .WithMany("QuoteItems")
+                        .HasForeignKey("MediumId");
+
+                    b.HasOne("Kwotty.Data.Entities.Quote", "Quote")
+                        .WithMany("QuoteItems")
+                        .HasForeignKey("QuoteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Medium");
+
+                    b.Navigation("Quote");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.Rating", b =>
+                {
+                    b.HasOne("Kwotty.Data.Entities.Quote", "Quote")
+                        .WithMany("QuoteRatings")
+                        .HasForeignKey("QuoteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Kwotty.Data.Entities.User", "User")
+                        .WithMany("QuoteRatings")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Quote");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.UserCategory", b =>
+                {
+                    b.HasOne("Kwotty.Data.Entities.Category", "Category")
+                        .WithMany("UserCategories")
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Kwotty.Data.Entities.UserSettings", "UserSettings")
+                        .WithMany("UserCategories")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Category");
+
+                    b.Navigation("UserSettings");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.UserSettings", b =>
+                {
+                    b.HasOne("Kwotty.Data.Entities.User", "User")
+                        .WithOne("Settings")
+                        .HasForeignKey("Kwotty.Data.Entities.UserSettings", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.Author", b =>
+                {
+                    b.Navigation("Quotes");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.Category", b =>
+                {
+                    b.Navigation("QuoteCategories");
+
+                    b.Navigation("UserCategories");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.Medium", b =>
+                {
+                    b.Navigation("Authors");
+
+                    b.Navigation("QuoteItems");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.Quote", b =>
+                {
+                    b.Navigation("QuoteCategories");
+
+                    b.Navigation("QuoteItems");
+
+                    b.Navigation("QuoteRatings");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.User", b =>
+                {
+                    b.Navigation("QuoteRatings");
+
+                    b.Navigation("Settings");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.UserSettings", b =>
+                {
+                    b.Navigation("UserCategories");
+                });
+#pragma warning restore 612, 618
+        }
+    }
+}
+
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Data\Migrations\20250414202902_UpdateFieldIsPauzedToIsPaused.Designer.cs
+
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Data\Migrations\KwottyDbContextModelSnapshot.cs
+
+// <auto-generated />
+using System;
+using Kwotty.Data;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+
+#nullable disable
+
+namespace Kwotty.Data.Migrations
+{
+    [DbContext(typeof(KwottyDbContext))]
+    partial class KwottyDbContextModelSnapshot : ModelSnapshot
+    {
+        protected override void BuildModel(ModelBuilder modelBuilder)
+        {
+#pragma warning disable 612, 618
+            modelBuilder
+                .HasDefaultSchema("kwotty")
+                .HasAnnotation("ProductVersion", "9.0.4")
+                .HasAnnotation("Relational:MaxIdentifierLength", 128);
+
+            SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
+
+            modelBuilder.Entity("Kwotty.Data.Entities.AccessToken", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("ExpiresOn")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("ExpiresOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("TokenValue")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("AccessTokens", "kwotty");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.Author", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("IsHidden")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid?>("MediumId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MediumId");
+
+                    b.ToTable("Authors", "kwotty");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.Category", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("IsHidden")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("NameSlug")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Categories", "kwotty");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.Medium", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("BaseUrl")
+                        .HasMaxLength(1024)
+                        .HasColumnType("nvarchar(1024)");
+
+                    b.Property<string>("CompleteUrl")
+                        .HasMaxLength(1152)
+                        .HasColumnType("nvarchar(1152)");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("FileName")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<bool>("IsHidden")
+                        .HasColumnType("bit");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Media", "kwotty");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.Quote", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("AuthorId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("IsHidden")
+                        .HasColumnType("bit");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AuthorId");
+
+                    b.ToTable("Quotes", "kwotty");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.QuoteCategory", b =>
+                {
+                    b.Property<Guid>("QuoteId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("CategoryId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("QuoteId", "CategoryId");
+
+                    b.HasIndex("CategoryId");
+
+                    b.ToTable("QuotesCategories", "kwotty");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.QuoteItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("MediumId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("QuoteId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("SortNumber")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(MAX)");
+
+                    b.Property<string>("TextSlug")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(MAX)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MediumId");
+
+                    b.HasIndex("QuoteId");
+
+                    b.ToTable("QuoteItems", "kwotty");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.Rating", b =>
+                {
+                    b.Property<Guid>("QuoteId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<long>("Id")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("RatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<byte>("Value")
+                        .HasColumnType("tinyint");
+
+                    b.HasKey("QuoteId", "UserId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("Ratings", "kwotty");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.User", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("Firstname")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<bool>("IsDisabled")
+                        .HasColumnType("bit");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Users", "kwotty");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.UserCategory", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("CategoryId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("UserId", "CategoryId");
+
+                    b.HasIndex("CategoryId");
+
+                    b.ToTable("UsersCategories", "kwotty");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.UserSettings", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsPaused")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTimeOffset?>("LastPausedOn")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("LastResumedOn")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("UserSettings", "kwotty");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.Author", b =>
+                {
+                    b.HasOne("Kwotty.Data.Entities.Medium", "Medium")
+                        .WithMany("Authors")
+                        .HasForeignKey("MediumId");
+
+                    b.Navigation("Medium");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.Quote", b =>
+                {
+                    b.HasOne("Kwotty.Data.Entities.Author", "Author")
+                        .WithMany("Quotes")
+                        .HasForeignKey("AuthorId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Author");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.QuoteCategory", b =>
+                {
+                    b.HasOne("Kwotty.Data.Entities.Category", "Category")
+                        .WithMany("QuoteCategories")
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Kwotty.Data.Entities.Quote", "Quote")
+                        .WithMany("QuoteCategories")
+                        .HasForeignKey("QuoteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Category");
+
+                    b.Navigation("Quote");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.QuoteItem", b =>
+                {
+                    b.HasOne("Kwotty.Data.Entities.Medium", "Medium")
+                        .WithMany("QuoteItems")
+                        .HasForeignKey("MediumId");
+
+                    b.HasOne("Kwotty.Data.Entities.Quote", "Quote")
+                        .WithMany("QuoteItems")
+                        .HasForeignKey("QuoteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Medium");
+
+                    b.Navigation("Quote");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.Rating", b =>
+                {
+                    b.HasOne("Kwotty.Data.Entities.Quote", "Quote")
+                        .WithMany("QuoteRatings")
+                        .HasForeignKey("QuoteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Kwotty.Data.Entities.User", "User")
+                        .WithMany("QuoteRatings")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Quote");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.UserCategory", b =>
+                {
+                    b.HasOne("Kwotty.Data.Entities.Category", "Category")
+                        .WithMany("UserCategories")
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Kwotty.Data.Entities.UserSettings", "UserSettings")
+                        .WithMany("UserCategories")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Category");
+
+                    b.Navigation("UserSettings");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.UserSettings", b =>
+                {
+                    b.HasOne("Kwotty.Data.Entities.User", "User")
+                        .WithOne("Settings")
+                        .HasForeignKey("Kwotty.Data.Entities.UserSettings", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.Author", b =>
+                {
+                    b.Navigation("Quotes");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.Category", b =>
+                {
+                    b.Navigation("QuoteCategories");
+
+                    b.Navigation("UserCategories");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.Medium", b =>
+                {
+                    b.Navigation("Authors");
+
+                    b.Navigation("QuoteItems");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.Quote", b =>
+                {
+                    b.Navigation("QuoteCategories");
+
+                    b.Navigation("QuoteItems");
+
+                    b.Navigation("QuoteRatings");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.User", b =>
+                {
+                    b.Navigation("QuoteRatings");
+
+                    b.Navigation("Settings");
+                });
+
+            modelBuilder.Entity("Kwotty.Data.Entities.UserSettings", b =>
+                {
+                    b.Navigation("UserCategories");
+                });
+#pragma warning restore 612, 618
+        }
+    }
+}
+
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Data\Migrations\KwottyDbContextModelSnapshot.cs
+
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Data\Repos\GenericRepo.cs
+
+using Kwotty.Application.Contracts;
+using Microsoft.EntityFrameworkCore;
+using System.Linq.Expressions;
+
+namespace Kwotty.Data.Repos;
+
+/// <summary>
+/// Generic repository implementation using EF Core and injected mapping.
+/// </summary>
+/// <typeparam name="TDomain">The domain model type.</typeparam>
+/// <typeparam name="TEntity">The corresponding persistence entity type.</typeparam>
+/// <typeparam name="TId">The type of the entity's identifier.</typeparam>
+public class GenericRepo<TDomain, TEntity, TId> : IGenericRepo<TDomain, TId>
+    where TDomain : class
+    where TEntity : class 
+    where TId : IEquatable<TId>
+{
+    protected readonly KwottyDbContext _context;
+    protected readonly IMapper<TDomain, TEntity> _mapper;
+    protected readonly DbSet<TEntity> _dbSet;
+
+    public GenericRepo(KwottyDbContext context, IMapper<TDomain, TEntity> mapper)
+    {
+        _context = context ?? throw new ArgumentNullException(nameof(context));
+        _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
+
+        _dbSet = _context.Set<TEntity>();
+    }
+
+    /// <summary>
+    /// Gets the underlying IQueryable for the DbSet.
+    /// Override in derived classes to add default eager loading (Includes).
+    /// Example: protected override IQueryable<Persistence.Quote> DbSetWithIncludes => _dbSet.Include(q => q.Author).Include(q => q.Items);
+    /// </summary>
+    protected virtual IQueryable<TEntity> DbSetWithIncludes => _dbSet.AsQueryable();
+
+    public virtual async Task<TDomain?> GetByIdAsync(TId id, CancellationToken cancellationToken = default)
+    {
+        // Use FindAsync for PK lookup. For includes, override DbSetWithIncludes and use FirstOrDefaultAsync.
+        var entity = await _dbSet.FindAsync(new object[] { id! }, cancellationToken);
+        
+        return _mapper.ToModel(entity);
+    }
+
+    public virtual async Task<List<TDomain>> GetAllAsync(CancellationToken cancellationToken = default)
+    {
+        // Use the potentially overridden DbSetWithIncludes
+        var entities = await DbSetWithIncludes.ToListAsync(cancellationToken);
+        
+        return _mapper.ToModelList(entities).ToList();
+    }
+
+    public virtual async Task<List<TDomain>> FindAsync(Expression<Func<TDomain, bool>> predicate, CancellationToken cancellationToken = default)
+    {
+        // WARNING: Still relies on potentially inefficient in-memory filtering.
+        // Override this in specific repositories or use a Specification pattern for efficient DB querying.
+
+        var allDomainEntities = await GetAllAsync(cancellationToken); // This uses the potentially overridden GetAllAsync
+        var results = allDomainEntities.Where(predicate.Compile()).ToList();
+
+        return results;
+    }
+
+    public virtual async Task<TDomain> AddAsync(TDomain domainEntity, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(domainEntity);
+
+        var persistenceEntity = _mapper.ToNewEntity(domainEntity);
+        if (persistenceEntity == null)
+        {
+            throw new InvalidOperationException($"Mapping domain entity type {typeof(TDomain).Name} to persistence entity resulted in null.");
+        }
+
+        await _dbSet.AddAsync(persistenceEntity, cancellationToken);
+        await _context.SaveChangesAsync(cancellationToken);
+
+        return _mapper.ToModel(persistenceEntity)!;
+    }
+
+    public virtual async Task UpdateAsync(TDomain domainEntity, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(domainEntity);
+
+        // Assuming TDomain has an 'Id' property of type TId.
+        // Use reflection or add an interface constraint (e.g., IEntity<TId>) to TDomain.
+        var idProperty = typeof(TDomain).GetProperty("Id");
+        if (idProperty == null || idProperty.PropertyType != typeof(TId))
+        {
+            throw new InvalidOperationException($"Domain entity type {typeof(TDomain).Name} must have an 'Id' property of type {typeof(TId).Name} accessible for updates.");
+        }
+        var id = (TId?)idProperty.GetValue(domainEntity);
+        if (id == null || id.Equals(default(TId))) // Check for default/null ID
+        {
+            throw new InvalidOperationException($"Domain entity type {typeof(TDomain).Name} must have a valid 'Id' for updates.");
+        }
+
+
+        // 1. Fetch the existing entity from the database
+        var existingEntity = await _dbSet.FindAsync(new object[] { id }, cancellationToken);
+
+        if (existingEntity == null)
+        {
+            // Log this situation
+            throw new KeyNotFoundException($"Entity of type {typeof(TEntity).Name} with ID {id} not found for update.");
+        }
+
+        // 2. Use the injected mapper's ApplyUpdate method to transfer changes
+        _mapper.ApplyUpdate(domainEntity, existingEntity);
+
+        // 3. Save changes (EF Core tracks changes on 'existingEntity')
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    public virtual async Task DeleteAsync(TId id, CancellationToken cancellationToken = default)
+    {
+        var entityToDelete = await _dbSet.FindAsync(new object[] { id! }, cancellationToken);
+
+        if (entityToDelete != null)
+        {
+            _dbSet.Remove(entityToDelete);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        // else: Entity not found. Decide whether to throw or not. Silently succeeding is often acceptable for deletes.
+    }
+
+    public virtual async Task<bool> ExistsAsync(TId id, CancellationToken cancellationToken = default)
+    {
+        var entity = await _dbSet.FindAsync(new object[] { id! }, cancellationToken);
+
+        return entity != null;
+    }
+}
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Data\Repos\GenericRepo.cs
+
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Domain\Models\AceessToken.cs
+
+namespace Kwotty.Domain.Models;
+
+public class AceessToken
+{
+    public int Id { get; set; }
+
+    public string TokenValue { get; set; } = string.Empty;
+
+    public Guid UserId { get; set; }
+
+    public DateTimeOffset ExpiresOnUtc { get; set; }
+
+    public DateTimeOffset? UsedOnUtc { get; set; }
+
+    public DateTimeOffset CreatedUtc { get; set; } = DateTimeOffset.UtcNow;
+}
+
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Domain\Models\AceessToken.cs
+
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Domain\Models\Author.cs
+
+namespace Kwotty.Domain.Models;
+
+/// <summary>
+/// Represents the author of content (e.g., Quotes).
+/// </summary>
+public class Author
+{
+    private readonly List<Quote> _quotes = [];
+
+    public Guid Id { get; }
+
+    public string Name { get; private set; }
+
+    public string? Slug { get; private set; }
+
+    public bool IsHidden { get; private set; }
+
+    public DateTimeOffset CreatedOnUtc { get; }
+
+    public string? CreatedBy { get; }
+
+    public Medium? ProfileMedium { get; private set; }
+
+    public IReadOnlyList<Quote> Quotes => _quotes.AsReadOnly();
+
+
+    public Author(Guid id, string name, string? slug, bool isHidden, DateTimeOffset createdOnUtc, string? createdBy, Medium? profileMedium = null)
+    {
+        Id = id;
+        Name = name; // Add validation
+        Slug = slug; // Generate?
+        IsHidden = isHidden;
+        CreatedOnUtc = createdOnUtc;
+        CreatedBy = createdBy;
+        ProfileMedium = profileMedium;
+    }
+
+
+    public void UpdateDetails(string name, string? slug, bool isHidden, Medium? profileMedium)
+    {
+        Name = name;
+        Slug = slug; // Regenerate?
+        IsHidden = isHidden;
+        ProfileMedium = profileMedium;
+    }
+
+    public void Hide() => IsHidden = true;
+
+    public void Show() => IsHidden = false;
+
+
+
+    #region Helpers
+
+    internal void AddQuote(Quote quote)
+    {
+        if (!_quotes.Any(q => q.Id == quote.Id))
+        { 
+            _quotes.Add(quote);
+        }
+    }
+
+    internal void RemoveQuote(Guid quoteId)
+    {
+        _quotes.RemoveAll(q => q.Id == quoteId);
+    }
+
+    #endregion Helpers
+}
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Domain\Models\Author.cs
+
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Domain\Models\Category.cs
+
+namespace Kwotty.Domain.Models;
+
+/// <summary>
+/// Represents a category for organizing content (e.g., Quotes).
+/// </summary>
+public class Category
+{
+    public Guid Id { get; }
+
+    public string Name { get; private set; }
+
+    public string? NameSlug { get; private set; }
+
+    public bool IsHidden { get; private set; }
+
+    public DateTimeOffset CreatedOnUtc { get; }
+
+    public string? CreatedBy { get; }
+
+
+    public Category(Guid id, string name, string? nameSlug, bool isHidden, DateTimeOffset createdAt, string? createdBy)
+    {
+        Id = id;
+        Name = name; // Add validation if required
+        NameSlug = nameSlug; // Could be generated
+        IsHidden = isHidden;
+        CreatedOnUtc = createdAt;
+        CreatedBy = createdBy;
+    }
+
+
+    public void UpdateDetails(string name, string? nameSlug, bool isHidden)
+    {
+        // Add validation
+        Name = name;
+        NameSlug = nameSlug; // Regenerate if needed?
+        IsHidden = isHidden;
+    }
+
+    public void Hide() => IsHidden = true;
+
+    public void Show() => IsHidden = false;
+}
+
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Domain\Models\Category.cs
+
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Domain\Models\Medium.cs
+
+namespace Kwotty.Domain.Models;
+
+/// <summary>
+/// Represents a media item (e.g., image, video file).
+/// </summary>
+public class Medium
+{
+    public Guid Id { get; }
+
+    public string? BaseUrl { get; private set; }
+
+    public string? FileName { get; private set; }
+
+    public string? CompleteUrl { get; private set; }
+
+    public bool IsHidden { get; private set; }
+
+    public DateTimeOffset CreatedOnUtc { get; }
+
+    public string? CreatedBy { get; }
+
+    
+    public Medium(Guid id, string? baseUrl, string? fileName, string? completeUrl, bool isHidden, DateTimeOffset createdOnUtc, string? createdBy)
+    {
+        Id = id;
+        BaseUrl = baseUrl;
+        FileName = fileName;
+        CompleteUrl = completeUrl ?? GenerateCompleteUrl(baseUrl, fileName); // Generate if not provided
+        IsHidden = isHidden;
+        CreatedOnUtc = createdOnUtc;
+        CreatedBy = createdBy;
+    }
+
+
+    public void UpdateDetails(string? baseUrl, string? fileName, bool isHidden)
+    {
+        BaseUrl = baseUrl;
+        FileName = fileName;
+        CompleteUrl = GenerateCompleteUrl(baseUrl, fileName);
+        IsHidden = isHidden;
+    }
+
+    public void Hide() => IsHidden = true;
+
+    public void Show() => IsHidden = false;
+
+
+
+    #region Helpers
+
+    private static string? GenerateCompleteUrl(string? baseUrl, string? fileName)
+    {
+        if (string.IsNullOrWhiteSpace(baseUrl) || string.IsNullOrWhiteSpace(fileName))
+        {
+            return null;
+        }
+
+        return $"{baseUrl.TrimEnd('/')}/{fileName.TrimStart('/')}";
+    }
+
+    #endregion Helpers
+}
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Domain\Models\Medium.cs
+
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Domain\Models\Quote.cs
+
+namespace Kwotty.Domain.Models;
+
+/// <summary>
+/// Represents a quote, potentially composed of multiple items.
+/// Acts as an Aggregate Root.
+/// </summary>
+public class Quote
+{
+    private readonly List<QuoteItem> _items = [];
+
+	private readonly List<Category> _categories = [];
+
+	private readonly List<Rating> _ratings = [];
+
+
+	public Guid Id { get; }
+
+    public bool IsHidden { get; private set; }
+
+    public DateTimeOffset CreatedOnUtc { get; }
+
+    public string? CreatedBy { get; }
+
+    public Author Author { get; private set; }
+
+    public IReadOnlyList<QuoteItem> Items => _items.AsReadOnly();
+
+    public IReadOnlyList<Category> Categories => _categories.AsReadOnly();
+
+    public IReadOnlyList<Rating> Ratings => _ratings.AsReadOnly();
+
+
+    public Quote(Guid id, Author author, bool isHidden, DateTimeOffset createdOnUtc, string? createdBy, IEnumerable<QuoteItem>? initialItems = null)
+    {
+        Id = id;
+        Author = author ?? throw new ArgumentNullException(nameof(author));
+        IsHidden = isHidden;
+        CreatedOnUtc = createdOnUtc;
+        CreatedBy = createdBy;
+
+        if (initialItems != null)
+        {
+            _items.AddRange(initialItems);
+        }
+    }
+
+	public void Hide() => IsHidden = true;
+
+	public void Show() => IsHidden = false;
+
+	public void ChangeAuthor(Author newAuthor)
+    {
+        // Author oldAuthor = Author;
+        Author = newAuthor ?? throw new ArgumentNullException(nameof(newAuthor));
+        // oldAuthor.RemoveQuoteReference(this.Id); // If managing bidirectional
+        // newAuthor.AddQuoteReference(this);
+    }
+
+    public void UpdateCategories(IEnumerable<Category> categories)
+    {
+        _categories.Clear();
+        _categories.AddRange(categories);
+    }
+
+
+    public void AddItem(Guid itemId, string? text, string? textSlug, int sortNumber, Medium? associatedMedium = null)
+    {
+        // Add validation (e.g., unique sortNumber?)
+        _items.Add(new QuoteItem(itemId, text, textSlug, sortNumber, associatedMedium));
+        _items.Sort((x, y) => x.SortNumber.CompareTo(y.SortNumber)); // Maintain sort order
+    }
+
+
+    public void RemoveItem(Guid itemId)
+    {
+        _items.RemoveAll(item => item.Id == itemId);
+    }
+
+
+    public void AddOrUpdateRating(User user, byte value, DateTimeOffset ratedOn)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+
+        var existingRating = _ratings.FirstOrDefault(r => r.UserId == user.Id);
+
+        if (existingRating != null)
+        {
+            existingRating.UpdateRating(value, ratedOn);
+        }
+        else
+        {
+            _ratings.Add(new Rating(this.Id, user.Id, value, ratedOn));
+        }
+    }
+
+    public void RemoveRating(User user)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+
+        _ratings.RemoveAll(r => r.UserId == user.Id);
+    }
+
+	public void SetInitialCategories(IEnumerable<Category> categories)
+	{
+		_categories.Clear();
+		_categories.AddRange(categories);
+	}
+
+
+	public void SetInitialRatings(IEnumerable<Rating> ratings)
+    {
+        _ratings.Clear();
+        _ratings.AddRange(ratings);
+    }
+}
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Domain\Models\Quote.cs
+
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Domain\Models\QuoteItem.cs
+
+namespace Kwotty.Domain.Models;
+
+/// <summary>
+/// Represents an individual item/line within a Quote.
+/// Owned by the Quote aggregate.
+/// </summary>
+public class QuoteItem
+{
+    public Guid Id { get; }
+    public string? Text { get; private set; }
+    public string? TextSlug { get; private set; }
+    public int SortNumber { get; private set; }
+
+
+    public Medium? Medium { get; private set; }
+
+
+    public QuoteItem(Guid id, string? text, string? textSlug, int sortNumber, Medium? medium = null)
+    {
+        Id = id;
+        Text = text;
+        TextSlug = textSlug; // Generate?
+        SortNumber = sortNumber;
+        Medium = medium;
+    }
+
+
+    public void Update(string? text, string? textSlug, int sortNumber, Medium? medium)
+    {
+        Text = text;
+        TextSlug = textSlug; // Regenerate?
+        SortNumber = sortNumber;
+        Medium = medium;
+    }
+}
+
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Domain\Models\QuoteItem.cs
+
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Domain\Models\Rating.cs
+
+namespace Kwotty.Domain.Models;
+
+/// <summary>
+/// Value Object representing a rating given BY a User.
+/// </summary>
+public class Rating
+{
+    public Guid QuoteId { get; }
+
+    public Guid UserId { get; }
+
+    public byte Value { get; private set; }
+
+    public DateTimeOffset RatedOn { get; private set; }
+
+
+
+    #region Helpers
+
+    internal Rating(Guid quoteId, Guid userId, byte value, DateTimeOffset ratedOn)
+    {
+        QuoteId = quoteId;
+        UserId = userId;
+        Value = value;
+        RatedOn = ratedOn;
+    }
+
+    internal void UpdateRating(byte value, DateTimeOffset ratedOn)
+    {
+        Value = value;
+        RatedOn = ratedOn;
+    }
+
+    #endregion Helpers
+}
+
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Domain\Models\Rating.cs
+
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Domain\Models\User.cs
+
+namespace Kwotty.Domain.Models;
+
+/// <summary>
+/// Represents a user within the application domain.
+/// </summary>
+public class User
+{
+    private readonly List<Rating> _ratings = new();
+
+
+    public Guid Id { get; }
+
+    public string? Email { get; private set; }
+
+    public string? Firstname { get; private set; }
+
+    public bool IsDisabled { get; private set; }
+
+    public UserSettings? Settings { get; internal set; }
+
+    public IReadOnlyList<Rating> GivenRatings => _ratings.AsReadOnly();
+
+
+    public User(Guid id, string? email, string? firstname, UserSettings? settings, bool isDisabled = false)
+    {
+        Id = id;
+        Email = email; // Consider validation
+        Firstname = firstname;
+        IsDisabled = isDisabled;
+        Settings = settings;
+    }
+
+
+    public void UpdateProfile(string email, string firstname)
+    {
+        // Add validation logic here
+        Email = email;
+        Firstname = firstname;
+    }
+
+    public void DisableAccount()
+    {
+        if (!IsDisabled)
+        {
+            IsDisabled = true;
+            // Raise domain event? e.g., UserDisabledEvent(this.Id)
+        }
+    }
+
+    public void EnableAccount()
+    {
+        if (IsDisabled)
+        {
+            IsDisabled = false;
+            // Raise domain event? e.g., UserEnabledEvent(this.Id)
+        }
+    }
+
+    
+}
+
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Domain\Models\User.cs
+
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Domain\Models\UserSettings.cs
+
+namespace Kwotty.Domain.Models;
+
+/// <summary>
+/// Represents settings specific to a User.
+/// Closely tied to the User aggregate.
+/// </summary>
+public class UserSettings
+{
+    private readonly List<Category> _preferredCategories = new();
+
+
+    public Guid UserId { get; }
+
+    public bool IsPaused { get; private set; }
+
+    public DateTimeOffset? LastPausedOnUtc { get; private set; }
+
+    public DateTimeOffset? LastResumedOnUtc { get; private set; }
+
+    public IReadOnlyList<Category> PreferredCategories => _preferredCategories.AsReadOnly();
+
+
+    public UserSettings(Guid userId)
+    {
+        UserId = userId;
+        IsPaused = false; // Default state
+    }
+
+
+    public void Pause()
+    {
+        if (!IsPaused)
+        {
+            IsPaused = true;
+            LastPausedOnUtc = DateTimeOffset.UtcNow;
+        }
+    }
+
+    public void Resume()
+    {
+        if (IsPaused)
+        {
+            IsPaused = false;
+            LastResumedOnUtc = DateTimeOffset.UtcNow;
+        }
+    }
+
+    public void UpdateCategories(IEnumerable<Category> categories)
+    {
+        // Replace entire list - simpler for mapping M-M
+        _preferredCategories.Clear();
+        _preferredCategories.AddRange(categories);
+        // More complex logic could involve Add/Remove methods
+    }
+
+    // Used internally or by mappers to set initial state
+    public void SetInitialCategories(IEnumerable<Category> categories)
+    {
+        _preferredCategories.Clear();
+        _preferredCategories.AddRange(categories);
+    }
+}
+
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Domain\Models\UserSettings.cs
+
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Infrastructure\Mappers\AccessTokenMapper.cs
+
+using Kwotty.Application.Contracts;
+using Models = Kwotty.Domain.Models;
+using Entities = Kwotty.Data.Entities;
+
+namespace Kwotty.Infrastructure.Mappers;
+
+public class AccessTokenMapper : IMapper<Models.AceessToken, Entities.AccessToken>
+{
+    public Models.AceessToken? ToModel(Entities.AccessToken? entity)
+    {
+        if (entity == null) return null;
+
+        return new Models.AceessToken
+        {
+            Id = entity.Id,
+            TokenValue = entity.TokenValue,
+            UserId = entity.UserId,
+            ExpiresOnUtc = entity.ExpiresOnUtc,
+            // Mapping Persistence.ExpiresOn (nullable DateTimeOffset) to Domain.UsedOnUtc (nullable DateTimeOffset)
+            // Verify if this mapping is correct based on your application logic.
+            UsedOnUtc = entity.ExpiresOn,
+            CreatedUtc = entity.CreatedOnUtc // Map Persistence.CreatedOnUtc -> Domain.CreatedUtc
+        };
+    }
+
+    public IEnumerable<Models.AceessToken> ToModelList(IEnumerable<Entities.AccessToken>? entities)
+    {
+        return entities?.Select(ToModel).Where(d => d != null).ToList() ?? Enumerable.Empty<Models.AceessToken>();
+    }
+
+    public Entities.AccessToken? ToNewEntity(Models.AceessToken? model)
+    {
+        if (model == null) return null;
+
+        return new Entities.AccessToken
+        {
+            // Id is typically DB generated for int keys
+            TokenValue = model.TokenValue,
+            UserId = model.UserId,
+            ExpiresOnUtc = model.ExpiresOnUtc,
+            ExpiresOn = model.UsedOnUtc, // Mapping Domain.UsedOnUtc -> Persistence.ExpiresOn? Verify.
+            CreatedOnUtc = model.CreatedUtc // Map Domain.CreatedUtc -> Persistence.CreatedOnUtc
+        };
+    }
+
+    public void ApplyUpdate(Models.AceessToken domain, Entities.AccessToken entity)
+    {
+        ArgumentNullException.ThrowIfNull(domain);
+        ArgumentNullException.ThrowIfNull(entity);
+
+        entity.TokenValue = domain.TokenValue;
+        entity.UserId = domain.UserId; // Should UserId change? Usually not after creation.
+        entity.ExpiresOnUtc = domain.ExpiresOnUtc;
+        entity.ExpiresOn = domain.UsedOnUtc; // Verify mapping
+        // Id and CreatedOnUtc typically not updated.
+    }
+}
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Infrastructure\Mappers\AccessTokenMapper.cs
+
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Infrastructure\Mappers\AuthorMapper.cs
+
+using Kwotty.Application.Contracts;
+using Models = Kwotty.Domain.Models;
+using Entities = Kwotty.Data.Entities;
+
+namespace Kwotty.Infrastructure.Mappers;
+
+public class AuthorMapper : IMapper<Models.Author, Entities.Author>
+{
+    private readonly IMapper<Models.Medium, Entities.Medium> _mediumMapper;
+
+    public AuthorMapper(IMapper<Models.Medium, Entities.Medium> mediumMapper)
+    {
+        _mediumMapper = mediumMapper ?? throw new ArgumentNullException(nameof(mediumMapper));
+    }
+
+    public Models.Author? ToModel(Entities.Author? entity)
+    {
+        if (entity == null) return null;
+
+        var mediumModel = _mediumMapper.ToModel(entity.Medium);
+
+        var domainAuthor = new Models.Author(
+            entity.Id,
+            entity.Name,
+            entity.Slug,
+            entity.IsHidden,
+            entity.CreatedOnUtc,
+            entity.CreatedBy,
+            mediumModel
+        );
+
+        // Note: Domain.Author.Quotes collection is not populated here.
+        // It should be loaded explicitly when needed (e.g., GetAuthorWithQuotes).
+
+        return domainAuthor;
+    }
+
+    public IEnumerable<Models.Author> ToModelList(IEnumerable<Entities.Author>? entities)
+    {
+        return entities?.Select(ToModel).Where(d => d != null).ToList() ?? Enumerable.Empty<Models.Author>();
+    }
+
+    public Entities.Author? ToNewEntity(Models.Author? model)
+    {
+        if (model == null) return null;
+        return new Entities.Author
+        {
+            Id = model.Id, // Assumes ID is set before calling
+            Name = model.Name,
+            Slug = model.Slug,
+            IsHidden = model.IsHidden,
+            CreatedOnUtc = model.CreatedOnUtc,
+            CreatedBy = model.CreatedBy,
+            MediumId = model.ProfileMedium?.Id // Set FK
+            // Medium navigation property not set here; EF handles via FK.
+            // Quotes collection not set here; managed by Quote entity's AuthorId.
+        };
+    }
+
+    public void ApplyUpdate(Models.Author model, Entities.Author entity)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+        ArgumentNullException.ThrowIfNull(entity);
+
+        entity.Name = model.Name;
+        entity.Slug = model.Slug;
+        entity.IsHidden = model.IsHidden;
+        entity.MediumId = model.ProfileMedium?.Id; // Update FK
+
+        // Id, CreatedOnUtc, CreatedBy are not updated.
+        // Quotes collection changes are managed via Quote entity.
+    }
+}
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Infrastructure\Mappers\AuthorMapper.cs
+
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Infrastructure\Mappers\CategoryMapper.cs
+
+using Kwotty.Application.Contracts;
+using Models = Kwotty.Domain.Models;
+using Entities = Kwotty.Data.Entities;
+
+namespace Kwotty.Infrastructure.Mappers;
+
+public class CategoryMapper : IMapper<Models.Category, Entities.Category>
+{
+    public Models.Category? ToModel(Entities.Category? entity)
+    {
+        if (entity == null) return null;
+        return new Models.Category(
+            entity.Id,
+            entity.Name,
+            entity.NameSlug,
+            entity.IsHidden,
+            entity.CreatedOnUtc, // Persistence property name
+            entity.CreatedBy
+        );
+    }
+
+    public IEnumerable<Models.Category> ToModelList(IEnumerable<Entities.Category>? entities)
+    {
+        return entities?.Select(ToModel).Where(d => d != null).ToList() ?? Enumerable.Empty<Models.Category>();
+    }
+
+    public Entities.Category? ToNewEntity(Models.Category? domain)
+    {
+        if (domain == null) return null;
+        return new Entities.Category
+        {
+            Id = domain.Id,
+            Name = domain.Name,
+            NameSlug = domain.NameSlug,
+            IsHidden = domain.IsHidden,
+            CreatedOnUtc = domain.CreatedOnUtc, // Domain property name (has typo?)
+            CreatedBy = domain.CreatedBy
+        };
+    }
+
+    public void ApplyUpdate(Models.Category domain, Entities.Category entity)
+    {
+        ArgumentNullException.ThrowIfNull(domain);
+        ArgumentNullException.ThrowIfNull(entity);
+
+        entity.Name = domain.Name;
+        entity.NameSlug = domain.NameSlug;
+        entity.IsHidden = domain.IsHidden;
+        // Id, CreatedOnUtc, CreatedBy not updated.
+        // UserCategories/QuoteCategories relationships updated via UserSettings/Quote mappers/repos.
+    }
+}
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Infrastructure\Mappers\CategoryMapper.cs
+
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Infrastructure\Mappers\MediumMapper.cs
+
+using Kwotty.Application.Contracts;
+using Models = Kwotty.Domain.Models;
+using Entities = Kwotty.Data.Entities;
+
+namespace Kwotty.Infrastructure.Mapper;
+
+public class MediumMapper : IMapper<Models.Medium, Entities.Medium>
+{
+    public Models.Medium? ToModel(Entities.Medium? entity)
+    {
+        if (entity == null) return null;
+        return new Models.Medium(
+            entity.Id,
+            entity.BaseUrl,
+            entity.FileName,
+            entity.CompleteUrl,
+            entity.IsHidden,
+            entity.CreatedOnUtc,
+            entity.CreatedBy
+        );
+    }
+
+    public IEnumerable<Models.Medium> ToModelList(IEnumerable<Entities.Medium>? entities)
+    {
+        return entities?.Select(ToModel).Where(d => d != null).ToList() ?? Enumerable.Empty<Models.Medium>();
+    }
+
+    public Entities.Medium? ToNewEntity(Models.Medium? domain)
+    {
+        if (domain == null) return null;
+        return new Entities.Medium
+        {
+            Id = domain.Id,
+            BaseUrl = domain.BaseUrl,
+            FileName = domain.FileName,
+            CompleteUrl = domain.CompleteUrl,
+            IsHidden = domain.IsHidden,
+            CreatedOnUtc = domain.CreatedOnUtc,
+            CreatedBy = domain.CreatedBy
+        };
+    }
+
+    public void ApplyUpdate(Models.Medium domain, Entities.Medium entity)
+    {
+        ArgumentNullException.ThrowIfNull(domain);
+        ArgumentNullException.ThrowIfNull(entity);
+
+        entity.BaseUrl = domain.BaseUrl;
+        entity.FileName = domain.FileName;
+        entity.CompleteUrl = domain.CompleteUrl;
+        entity.IsHidden = domain.IsHidden;
+        // Id, CreatedOnUtc, CreatedBy not updated.
+    }
+}
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Infrastructure\Mappers\MediumMapper.cs
+
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Infrastructure\Mappers\QuoteItemMapper.cs
+
+using Kwotty.Application.Contracts;
+using Entities = Kwotty.Data.Entities;
+using Models = Kwotty.Domain.Models;
+
+namespace Kwotty.Infrastructure.Mappers;
+
+public class QuoteItemMapper : IMapper<Models.QuoteItem, Entities.QuoteItem>
+{
+    private readonly IMapper<Models.Medium, Entities.Medium> _mediumMapper;
+
+    public QuoteItemMapper(IMapper<Models.Medium, Entities.Medium> mediumMapper)
+    {
+        _mediumMapper = mediumMapper ?? throw new ArgumentNullException(nameof(mediumMapper));
+    }
+
+    public Models.QuoteItem? ToModel(Entities.QuoteItem? entity)
+    {
+        if (entity == null) return null;
+
+        var mediumModel = _mediumMapper.ToModel(entity.Medium);
+
+        return new Models.QuoteItem(
+            entity.Id,
+            entity.Text,
+            entity.TextSlug,
+            entity.SortNumber,
+            mediumModel // Pass mapped medium
+        );
+    }
+
+    public IEnumerable<Models.QuoteItem> ToModelList(IEnumerable<Entities.QuoteItem>? entities)
+    {
+        return entities?.Select(ToModel).Where(d => d != null).ToList() ?? Enumerable.Empty<Models.QuoteItem>();
+    }
+
+    public Entities.QuoteItem? ToNewEntity(Models.QuoteItem? domain)
+    {
+        if (domain == null) return null;
+
+        return new Entities.QuoteItem
+        {
+            Id = domain.Id,
+            Text = domain.Text,
+            TextSlug = domain.TextSlug,
+            SortNumber = domain.SortNumber,
+            MediumId = domain.Medium?.Id, // Use correct domain property & set FK
+            // QuoteId is set by EF when adding to a tracked Quote entity's collection
+        };
+    }
+
+    public void ApplyUpdate(Models.QuoteItem domain, Entities.QuoteItem entity)
+    {
+        ArgumentNullException.ThrowIfNull(domain);
+        ArgumentNullException.ThrowIfNull(entity);
+
+        entity.Text = domain.Text;
+        entity.TextSlug = domain.TextSlug;
+        entity.SortNumber = domain.SortNumber;
+        entity.MediumId = domain.Medium?.Id; // Update FK
+        // Id and QuoteId typically not updated here.
+    }
+}
+
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Infrastructure\Mappers\QuoteItemMapper.cs
+
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Infrastructure\Mappers\QuoteMapper.cs
+
+using Kwotty.Application.Contracts;
+using Models = Kwotty.Domain.Models;
+using Entities = Kwotty.Data.Entities;
+
+namespace Kwotty.Infrastructure.Mappers;
+
+public class QuoteMapper : IMapper<Models.Quote, Entities.Quote>
+{
+    // Dependencies on other mappers
+    private readonly IMapper<Models.Author, Entities.Author> _authorMapper;
+    private readonly IMapper<Models.QuoteItem, Entities.QuoteItem> _itemMapper;
+    private readonly IMapper<Models.Category, Entities.Category> _categoryMapper;
+    private readonly IMapper<Models.Rating, Entities.Rating> _ratingMapper;
+
+    // Constructor injection for dependencies
+    public QuoteMapper(
+        IMapper<Models.Author, Entities.Author> authorMapper,
+        IMapper<Models.QuoteItem, Entities.QuoteItem> itemMapper,
+        IMapper<Models.Category, Entities.Category> categoryMapper,
+        IMapper<Models.Rating, Entities.Rating> ratingMapper)
+    {
+        _authorMapper = authorMapper ?? throw new ArgumentNullException(nameof(authorMapper));
+        _itemMapper = itemMapper ?? throw new ArgumentNullException(nameof(itemMapper));
+        _categoryMapper = categoryMapper ?? throw new ArgumentNullException(nameof(categoryMapper));
+        _ratingMapper = ratingMapper ?? throw new ArgumentNullException(nameof(ratingMapper));
+    }
+
+    public Models.Quote? ToModel(Entities.Quote? entity)
+    {
+        if (entity == null) return null;
+
+        // Map Author (required dependency)
+        var authorModel = _authorMapper.ToModel(entity.Author);
+
+        if (authorModel == null && entity.AuthorId != Guid.Empty)
+        {
+            // Log warning or error: Author data missing for Quote
+            Console.Error.WriteLine($"Warning: Author {entity.AuthorId} not loaded or found for Quote {entity.Id}.");
+            return null; // Cannot create Quote model without Author
+        }
+
+        if (authorModel == null) return null;
+
+
+        // Map Items (owned collection)
+        var itemsModel = _itemMapper.ToModelList(entity.QuoteItems)
+                                     .OrderBy(i => i.SortNumber)
+                                     .ToList();
+
+        // Create Model object
+        var quoteModel = new Models.Quote(
+            entity.Id,
+            authorModel,
+            entity.IsHidden,
+            entity.CreatedOnUtc,
+            entity.CreatedBy,
+            itemsModel
+        );
+
+        // Map Categories (from join table)
+        if (entity.QuoteCategories != null)
+        {
+            var categoriesModel = entity.QuoteCategories
+                .Select(qc => _categoryMapper.ToModel(qc.Category)) // Map the Category part
+                .Where(c => c != null)
+                .ToList();
+
+            if (categoriesModel.Any()) quoteModel.SetInitialCategories(categoriesModel!); // Use internal setter
+        }
+
+        // Map Ratings (from join table)
+        if (entity.QuoteRatings != null)
+        {
+            var ratingModel = _ratingMapper.ToModelList(entity.QuoteRatings).ToList();
+            if (ratingModel.Any()) quoteModel.SetInitialRatings(ratingModel); // Use internal setter
+        }
+
+        return quoteModel;
+    }
+
+    public IEnumerable<Models.Quote> ToModelList(IEnumerable<Entities.Quote>? entities)
+    {
+        return entities?.Select(ToModel).Where(d => d != null).ToList() ?? Enumerable.Empty<Models.Quote>();
+    }
+
+    public Entities.Quote? ToNewEntity(Models.Quote? model)
+    {
+        if (model == null) return null;
+
+        var entity = new Entities.Quote
+        {
+            Id = model.Id,
+            IsHidden = model.IsHidden,
+            CreatedOnUtc = model.CreatedOnUtc,
+            CreatedBy = model.CreatedBy,
+            AuthorId = model.Author.Id, // Set Author FK
+
+            // Map owned QuoteItems
+            QuoteItems = model.Items?
+                .Select(_itemMapper.ToNewEntity) // Use injected mapper
+                .Where(qi => qi != null)
+                .ToHashSet()! ?? new HashSet<Entities.QuoteItem>(),
+
+            // Map Categories -> creates join entities (QuoteCategory)
+            // Assumes Categories exist. Attaching existing needs DbContext.
+            QuoteCategories = model.Categories?
+                .Select(catDomain => new Entities.QuoteCategory { QuoteId = model.Id, CategoryId = catDomain.Id })
+                .ToHashSet() ?? new HashSet<Entities.QuoteCategory>(),
+
+            // Map Ratings -> creates join entities (Rating)
+            // Assumes Users exist. Attaching existing needs DbContext.
+            QuoteRatings = model.Ratings? // Use correct domain property
+                .Select(_ratingMapper.ToNewEntity) // Use injected mapper
+                .Where(r => r != null)
+                .ToHashSet()! ?? new HashSet<Entities.Rating>()
+        };
+
+        // Ensure FKs are set on newly created Rating entities
+        foreach (var ratingEntity in entity.QuoteRatings)
+        { 
+            ratingEntity.QuoteId = entity.Id;
+        }
+        // EF handles QuoteId on QuoteItems when added to collection
+
+        return entity;
+    }
+
+    public void ApplyUpdate(Models.Quote domain, Entities.Quote entity)
+    {
+        ArgumentNullException.ThrowIfNull(domain);
+        ArgumentNullException.ThrowIfNull(entity);
+
+        entity.IsHidden = domain.IsHidden;
+        entity.AuthorId = domain.Author.Id; // Update FK if Author can change
+
+        // WARNING: Collection synchronization (Items, Categories, Ratings) is NOT handled here.
+        // This requires complex logic comparing collections and interacting with the DbContext
+        // within the Repository or Service layer.
+        // Example: You would need to load entity.QuoteItems, entity.QuoteCategories, entity.QuoteRatings,
+        // compare them with domain.Items, domain.Categories, domain.ReceivedRatings,
+        // identify items/links to add, remove, or update, and modify the DbContext state accordingly.
+    }
+}
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Infrastructure\Mappers\QuoteMapper.cs
+
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Infrastructure\Mappers\RatingMapper.cs
+
+using Kwotty.Application.Contracts;
+using Models = Kwotty.Domain.Models;
+using Entities = Kwotty.Data.Entities;
+
+namespace Kwotty.Infrastructure.Mappers;
+
+public class RatingMapper : IMapper<Models.Rating, Entities.Rating>
+{
+    public Models.Rating? ToModel(Entities.Rating? entity)
+    {
+        if (entity == null) return null;
+
+        // Use reflection to call internal constructor or add a public factory method to Models.Rating
+        var constructor = typeof(Models.Rating).GetConstructor(
+             System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public, null,
+             new Type[] { typeof(Guid), typeof(Guid), typeof(byte), typeof(DateTimeOffset) }, null);
+
+        if (constructor != null)
+        {
+            return (Models.Rating)constructor.Invoke(new object[] { entity.QuoteId, entity.UserId, entity.Value, entity.RatedOnUtc });
+        }
+        // Handle constructor access error (e.g., log, throw, or return null)
+        Console.Error.WriteLine($"Error: Could not access internal constructor for Models.Rating when mapping Entities.Rating Id={entity.Id}.");
+        return null; // Or throw
+    }
+
+    public IEnumerable<Models.Rating> ToModelList(IEnumerable<Entities.Rating>? entities)
+    {
+        return entities?.Select(ToModel).Where(d => d != null).ToList() ?? Enumerable.Empty<Models.Rating>();
+    }
+
+    public Entities.Rating? ToNewEntity(Models.Rating? domain)
+    {
+        if (domain == null) return null;
+        return new Entities.Rating
+        {
+            // Id (long) is DB generated
+            QuoteId = domain.QuoteId, // Assumes Quote exists/is tracked
+            UserId = domain.UserId,   // Assumes User exists/is tracked
+            Value = domain.Value,
+            RatedOnUtc = domain.RatedOn // Map domain name to entity name
+        };
+    }
+
+    public void ApplyUpdate(Models.Rating domain, Entities.Rating entity)
+    {
+        // This assumes you identify the correct 'entity' using QuoteId/UserId
+        // in the repository/service before calling this.
+        ArgumentNullException.ThrowIfNull(domain);
+        ArgumentNullException.ThrowIfNull(entity);
+
+        // Ensure we are updating the correct rating entity if found via composite key
+        if (entity.QuoteId == domain.QuoteId && entity.UserId == domain.UserId)
+        {
+            entity.Value = domain.Value;
+            entity.RatedOnUtc = domain.RatedOn;
+        }
+        else
+        {
+            // Log or throw if the wrong entity was passed for update
+            throw new ArgumentException($"ApplyUpdate called on Entities.Rating Id={entity.Id} which does not match Models.Rating composite key ({domain.QuoteId}/{domain.UserId}).");
+        }
+        // Id, QuoteId, UserId are not updated.
+    }
+}
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Infrastructure\Mappers\RatingMapper.cs
+
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Infrastructure\Mappers\UserMapper.cs
+
+using Kwotty.Application.Contracts;
+using Models = Kwotty.Domain.Models;
+using Entities = Kwotty.Data.Entities;
+
+namespace Kwotty.Infrastructure.Mappers;
+
+public class UserMapper : IMapper<Models.User, Entities.User>
+{
+    // Dependencies
+    private readonly IMapper<Models.UserSettings, Entities.UserSettings> _settingsMapper;
+    private readonly IMapper<Models.Rating, Entities.Rating> _ratingMapper;
+
+    public UserMapper(
+        IMapper<Models.UserSettings, Entities.UserSettings> settingsMapper,
+        IMapper<Models.Rating, Entities.Rating> ratingMapper)
+    {
+        _settingsMapper = settingsMapper ?? throw new ArgumentNullException(nameof(settingsMapper));
+        _ratingMapper = ratingMapper ?? throw new ArgumentNullException(nameof(ratingMapper));
+    }
+
+    public Models.User? ToModel(Entities.User? entity)
+    {
+        if (entity == null) return null;
+
+        var userSettingsModel = _settingsMapper.ToModel(entity.Settings);
+
+        var userModel = new Models.User(
+            entity.Id,
+            entity.Email,
+            entity.Firstname,
+            userSettingsModel,
+            entity.IsDisabled
+        );
+
+        // Map Ratings given by user
+        if (entity.QuoteRatings != null)
+        {
+            // Models.User needs a method to accept the initial list if managing it.
+            // The provided Models.User doesn't have AddRatingReference/SetInitialGivenRatings.
+            // Assuming for now the list isn't populated on the User domain object directly from here.
+            // If needed, add SetInitialGivenRatings(IEnumerable<Rating>) to Models.User and call it:
+            // var ratings = _ratingMapper.ToDomainList(entity.QuoteRatings).ToList();
+            // if (ratings.Any()) domainUser.SetInitialGivenRatings(ratings);
+        }
+
+        return userModel;
+    }
+
+    public IEnumerable<Models.User> ToModelList(IEnumerable<Entities.User>? entities)
+    {
+        return entities?.Select(ToModel).Where(d => d != null).ToList() ?? Enumerable.Empty<Models.User>();
+    }
+
+    public Entities.User? ToNewEntity(Models.User? domain)
+    {
+        if (domain == null) return null;
+        var entity = new Entities.User
+        {
+            Id = domain.Id,
+            Email = domain.Email,
+            Firstname = domain.Firstname,
+            IsDisabled = domain.IsDisabled,
+            CreatedOnUtc = DateTimeOffset.UtcNow, // Set on creation; Domain model lacks this
+            Settings = _settingsMapper.ToNewEntity(domain.Settings),
+            // Map Ratings (Requires handling existing Quotes in Service/Repo)
+            QuoteRatings = domain.GivenRatings? // Use domain property name
+                .Select(_ratingMapper.ToNewEntity) // Use injected mapper
+                .Where(r => r != null)
+                .ToHashSet()! ?? new HashSet<Entities.Rating>()
+        };
+        // Ensure FKs are set
+        if (entity.Settings != null) entity.Settings.UserId = entity.Id;
+        foreach (var ratingEntity in entity.QuoteRatings) { ratingEntity.UserId = entity.Id; }
+
+        return entity;
+    }
+
+    public void ApplyUpdate(Models.User domain, Entities.User entity)
+    {
+        ArgumentNullException.ThrowIfNull(domain);
+        ArgumentNullException.ThrowIfNull(entity);
+
+        entity.Email = domain.Email;
+        entity.Firstname = domain.Firstname;
+        entity.IsDisabled = domain.IsDisabled;
+        // Id, CreatedOnUtc not updated.
+        // UserSettings relationship update needs careful handling (usually via UserSettings ApplyUpdate).
+        // QuoteRatings collection updates need complex handling (Service/Repo).
+    }
+}
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Infrastructure\Mappers\UserMapper.cs
+
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Infrastructure\Mappers\UserSettingsMapper.cs
+
+using Kwotty.Application.Contracts;
+using Models = Kwotty.Domain.Models;
+using Entities = Kwotty.Data.Entities;
+
+namespace Kwotty.Infrastructure.Mappers;
+
+public class UserSettingsMapper : IMapper<Models.UserSettings, Entities.UserSettings>
+{
+    private readonly IMapper<Models.Category, Entities.Category> _categoryMapper;
+
+    public UserSettingsMapper(IMapper<Models.Category, Entities.Category> categoryMapper)
+    {
+        _categoryMapper = categoryMapper ?? throw new ArgumentNullException(nameof(categoryMapper));
+    }
+    public UserSettingsMapper() : this(new CategoryMapper()) { }
+
+
+    public Models.UserSettings? ToModel(Entities.UserSettings? entity)
+    {
+        if (entity == null) return null;
+        var userSettingsModel = new Models.UserSettings(entity.UserId);
+
+        // Apply state
+        if (entity.IsPaused) userSettingsModel.Pause(); else userSettingsModel.Resume(); // Use domain methods
+        // Reflect exact timestamps from persistence if they differ from UtcNow in methods
+        typeof(Models.UserSettings).GetProperty("LastPausedOnUtc")?.SetValue(userSettingsModel, entity.LastPausedOn); // Map to correct domain property
+        typeof(Models.UserSettings).GetProperty("LastResumedOnUtc")?.SetValue(userSettingsModel, entity.LastResumedOn); // Map to correct domain property
+
+        // Map categories
+        if (entity.UserCategories != null)
+        {
+            var categories = entity.UserCategories
+                .Where(uc => uc.Category != null)
+                .Select(uc => _categoryMapper.ToModel(uc.Category!)) // Use injected mapper
+                .Where(c => c != null).ToList();
+
+            if (categories.Any()) userSettingsModel.SetInitialCategories(categories!); // Use internal setter
+        }
+
+        return userSettingsModel;
+    }
+
+    public IEnumerable<Models.UserSettings> ToModelList(IEnumerable<Entities.UserSettings>? entities)
+    {
+        return entities?.Select(ToModel).Where(d => d != null).ToList() ?? Enumerable.Empty<Models.UserSettings>();
+    }
+
+    public Entities.UserSettings? ToNewEntity(Models.UserSettings? domain)
+    {
+        if (domain == null) return null;
+        var entity = new Entities.UserSettings
+        {
+            UserId = domain.UserId, // Must match User.Id
+            IsPaused = domain.IsPaused, // Map domain name to entity name
+            LastPausedOn = domain.LastPausedOnUtc, // Map domain name to entity name
+            LastResumedOn = domain.LastResumedOnUtc, // Map domain name to entity name
+            // Map preferred categories -> UserCategory join entities (Complex: Requires Service/Repo)
+            UserCategories = domain.PreferredCategories?
+                .Select(catDomain => new Entities.UserCategory { UserId = domain.UserId, CategoryId = catDomain.Id })
+                .ToHashSet() ?? new HashSet<Entities.UserCategory>()
+        };
+        return entity;
+    }
+
+    public void ApplyUpdate(Models.UserSettings domain, Entities.UserSettings entity)
+    {
+        ArgumentNullException.ThrowIfNull(domain);
+        ArgumentNullException.ThrowIfNull(entity);
+
+        entity.IsPaused = domain.IsPaused; // Map domain name to entity name
+        entity.LastPausedOn = domain.LastPausedOnUtc; // Map domain name to entity name
+        entity.LastResumedOn = domain.LastResumedOnUtc; // Map domain name to entity name
+        // UserId not updated.
+        // UserCategories collection updates need complex handling (Service/Repo).
+    }
+}
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Infrastructure\Mappers\UserSettingsMapper.cs
+
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Web\Pages\Error.cshtml.cs
+
+using System.Diagnostics;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
+
+namespace Kwotty.Web.Pages;
+
+[ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
+[IgnoreAntiforgeryToken]
+public class ErrorModel : PageModel
+{
+    public string? RequestId { get; set; }
+
+    public bool ShowRequestId => !string.IsNullOrEmpty(RequestId);
+
+    private readonly ILogger<ErrorModel> _logger;
+
+    public ErrorModel(ILogger<ErrorModel> logger)
+    {
+        _logger = logger;
+    }
+
+    public void OnGet()
+    {
+        RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier;
+    }
+}
+
+
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Web\Pages\Error.cshtml.cs
+
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Web\Pages\Index.cshtml.cs
+
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
+
+namespace Kwotty.Web.Pages;
+
+public class IndexModel : PageModel
+{
+    private readonly ILogger<IndexModel> _logger;
+
+    public IndexModel(ILogger<IndexModel> logger)
+    {
+        _logger = logger;
+    }
+
+    public void OnGet()
+    {
+
+    }
+}
+
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Web\Pages\Index.cshtml.cs
+
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Web\Pages\Privacy.cshtml.cs
+
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
+
+namespace Kwotty.Web.Pages;
+
+public class PrivacyModel : PageModel
+{
+    private readonly ILogger<PrivacyModel> _logger;
+
+    public PrivacyModel(ILogger<PrivacyModel> logger)
+    {
+        _logger = logger;
+    }
+
+    public void OnGet()
+    {
+    }
+}
+
+
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Web\Pages\Privacy.cshtml.cs
+
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Web\EndPoints\Authentication\AuthenticateEndPoint.cs
+
+namespace Kwotty.Web.EndPoints.Authentication;
+
+public static class AuthenticateEndPoint
+{
+    public const string Name = "Authenticate";
+
+    public static IEndpointRouteBuilder MapAuthenticate(this IEndpointRouteBuilder app)
+    {
+        app.MapPost("authenticate", async (CancellationToken cancellationToken) =>
+        {
+            return TypedResults.Ok();
+        })
+        .Produces(StatusCodes.Status200OK)
+        .Produces(StatusCodes.Status400BadRequest);
+
+        return app;
+    }
+}
+
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Web\EndPoints\Authentication\AuthenticateEndPoint.cs
+
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Web\EndPoints\Authentication\AuthenticateEndPointExtensions.cs
+
+namespace Kwotty.Web.EndPoints.Authentication;
+
+public static class AuthenticateEndPointExtensions
+{
+    public static IEndpointRouteBuilder MapAuthenticationEndpoints(this IEndpointRouteBuilder app)
+    {
+        app.MapAuthenticate();
+
+        return app;
+    }
+}
+
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Web\EndPoints\Authentication\AuthenticateEndPointExtensions.cs
+
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Web\obj\Debug\net9.0\Kwotty.Web.MvcApplicationPartsAssemblyInfo.cs
+
+//------------------------------------------------------------------------------
+// <auto-generated>
+//     This code was generated by a tool.
+//     Runtime Version:4.0.30319.42000
+//
+//     Changes to this file may cause incorrect behavior and will be lost if
+//     the code is regenerated.
+// </auto-generated>
+//------------------------------------------------------------------------------
+
+using System;
+using System.Reflection;
+
+[assembly: Microsoft.AspNetCore.Mvc.ApplicationParts.ApplicationPartAttribute("Swashbuckle.AspNetCore.SwaggerGen")]
+
+// Generated by the MSBuild WriteCodeFragment class.
+
+
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Web\obj\Debug\net9.0\Kwotty.Web.MvcApplicationPartsAssemblyInfo.cs
+
+*** Begin file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Web\obj\Debug\net9.0\Kwotty.Web.RazorAssemblyInfo.cs
+
+//------------------------------------------------------------------------------
+// <auto-generated>
+//     This code was generated by a tool.
+//     Runtime Version:4.0.30319.42000
+//
+//     Changes to this file may cause incorrect behavior and will be lost if
+//     the code is regenerated.
+// </auto-generated>
+//------------------------------------------------------------------------------
+
+using System;
+using System.Reflection;
+
+[assembly: Microsoft.AspNetCore.Mvc.ApplicationParts.ProvideApplicationPartFactoryAttribute("Microsoft.AspNetCore.Mvc.ApplicationParts.ConsolidatedAssemblyApplicationPartFact" +
+    "ory, Microsoft.AspNetCore.Mvc.Razor")]
+
+// Generated by the MSBuild WriteCodeFragment class.
+
+
+*** End file: C:\Users\ekzak\OneDrive - Ekzakt\repos\Ekzakt\Kwotty\src\Kwotty.Web\obj\Debug\net9.0\Kwotty.Web.RazorAssemblyInfo.cs
+
