@@ -7,7 +7,7 @@ namespace Kwotty.Application.Contracts;
 /// </summary>
 /// <typeparam name="TDomain">The domain model type this repository works with.</typeparam>
 /// <typeparam name="TId">The type of the entity's identifier.</typeparam>
-public interface IGenericRepository<TDomain, TId> where TDomain : class
+public interface IGenericRepo<TDomain, TId> where TDomain : class
 {
     /// <summary>
     /// Gets a domain entity by its identifier asynchronously.
