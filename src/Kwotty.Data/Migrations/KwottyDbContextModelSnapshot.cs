@@ -405,7 +405,7 @@ namespace Kwotty.Data.Migrations
             modelBuilder.Entity("Kwotty.Data.Entities.UserSettings", b =>
                 {
                     b.HasOne("Kwotty.Data.Entities.User", "User")
-                        .WithOne("UserSettings")
+                        .WithOne("Settings")
                         .HasForeignKey("Kwotty.Data.Entities.UserSettings", "UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -445,7 +445,7 @@ namespace Kwotty.Data.Migrations
                 {
                     b.Navigation("QuoteRatings");
 
-                    b.Navigation("UserSettings");
+                    b.Navigation("Settings");
                 });
 
             modelBuilder.Entity("Kwotty.Data.Entities.UserSettings", b =>
