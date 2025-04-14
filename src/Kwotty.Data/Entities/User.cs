@@ -26,7 +26,7 @@ public class User
     public DateTimeOffset CreateOnUtc { get; set; }
 
 
-    public virtual UserSettings? UserSettings { get; set; }
+    public virtual UserSettings? Settings { get; set; }
 
 
     public virtual ICollection<Rating> QuoteRatings { get; set; } = new HashSet<Rating>();

@@ -8,6 +8,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Kwotty.Application\Kwotty.Application.csproj" />
+    <ProjectReference Include="..\Kwotty.Data\Kwotty.Data.csproj" />
+    <ProjectReference Include="..\Kwotty.Domain\Kwotty.Domain.csproj" />
   </ItemGroup>
 
 </Project>

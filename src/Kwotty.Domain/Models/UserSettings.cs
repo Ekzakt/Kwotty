@@ -45,15 +45,16 @@ public class UserSettings
         }
     }
 
-    public void UpdatePreferredCategories(IEnumerable<Category> categories)
+    public void UpdateCategories(IEnumerable<Category> categories)
     {
         // Replace entire list - simpler for mapping M-M
         _preferredCategories.Clear();
         _preferredCategories.AddRange(categories);
         // More complex logic could involve Add/Remove methods
     }
+
     // Used internally or by mappers to set initial state
-    internal void SetInitialPreferredCategories(IEnumerable<Category> categories)
+    public void SetInitialCategories(IEnumerable<Category> categories)
     {
         _preferredCategories.Clear();
         _preferredCategories.AddRange(categories);

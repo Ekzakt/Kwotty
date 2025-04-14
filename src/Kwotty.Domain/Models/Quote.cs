@@ -27,7 +27,7 @@ public class Quote
 
     public IReadOnlyList<Category> Categories => _categories.AsReadOnly();
 
-    public IReadOnlyList<Rating> ReceivedRatings => _ratings.AsReadOnly();
+    public IReadOnlyList<Rating> Ratings => _ratings.AsReadOnly();
 
 
     public Quote(Guid id, Author author, bool isHidden, DateTimeOffset createdOnUtc, string? createdBy, IEnumerable<QuoteItem>? initialItems = null)
@@ -100,22 +100,16 @@ public class Quote
         _ratings.RemoveAll(r => r.UserId == user.Id);
     }
 
-
-
-	#region Helpers
-
-	internal void SetInitialCategories(IEnumerable<Category> categories)
+	public void SetInitialCategories(IEnumerable<Category> categories)
 	{
 		_categories.Clear();
 		_categories.AddRange(categories);
 	}
 
 
-	internal void SetInitialReceivedRatings(IEnumerable<Rating> ratings)
+	public void SetInitialRatings(IEnumerable<Rating> ratings)
     {
         _ratings.Clear();
         _ratings.AddRange(ratings);
     }
-
-	#endregion Helpers
 }

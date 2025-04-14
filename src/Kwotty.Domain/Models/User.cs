@@ -21,12 +21,13 @@ public class User
     public IReadOnlyList<Rating> GivenRatings => _ratings.AsReadOnly();
 
 
-    public User(Guid id, string? email, string? firstname, bool isDisabled = false)
+    public User(Guid id, string? email, string? firstname, UserSettings? settings, bool isDisabled = false)
     {
         Id = id;
         Email = email; // Consider validation
         Firstname = firstname;
         IsDisabled = isDisabled;
+        Settings = settings;
     }
 
 

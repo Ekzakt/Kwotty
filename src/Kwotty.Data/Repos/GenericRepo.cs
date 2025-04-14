@@ -39,7 +39,7 @@ public class GenericRepo<TDomain, TEntity, TId> : IGenericRepo<TDomain, TId>
         // Use FindAsync for PK lookup. For includes, override DbSetWithIncludes and use FirstOrDefaultAsync.
         var entity = await _dbSet.FindAsync(new object[] { id! }, cancellationToken);
         
-        return _mapper.ToDomain(entity);
+        return _mapper.ToModel(entity);
     }
 
     public virtual async Task<List<TDomain>> GetAllAsync(CancellationToken cancellationToken = default)
@@ -47,7 +47,7 @@ public class GenericRepo<TDomain, TEntity, TId> : IGenericRepo<TDomain, TId>
         // Use the potentially overridden DbSetWithIncludes
         var entities = await DbSetWithIncludes.ToListAsync(cancellationToken);
         
-        return _mapper.ToDomainList(entities).ToList();
+        return _mapper.ToModelList(entities).ToList();
     }
 
     public virtual async Task<List<TDomain>> FindAsync(Expression<Func<TDomain, bool>> predicate, CancellationToken cancellationToken = default)
@@ -74,7 +74,7 @@ public class GenericRepo<TDomain, TEntity, TId> : IGenericRepo<TDomain, TId>
         await _dbSet.AddAsync(persistenceEntity, cancellationToken);
         await _context.SaveChangesAsync(cancellationToken);
 
-        return _mapper.ToDomain(persistenceEntity)!;
+        return _mapper.ToModel(persistenceEntity)!;
     }
 
     public virtual async Task UpdateAsync(TDomain domainEntity, CancellationToken cancellationToken = default)

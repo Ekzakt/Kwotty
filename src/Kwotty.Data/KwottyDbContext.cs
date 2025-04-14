@@ -76,7 +76,7 @@ public class KwottyDbContext : DbContext
         // Configure One-to-One relationship between User and UserSettings
 
         modelBuilder.Entity<User>()
-            .HasOne(u => u.UserSettings)
+            .HasOne(u => u.Settings)
             .WithOne(us => us.User)
             .HasForeignKey<UserSettings>(us => us.UserId);
 
