@@ -4,13 +4,13 @@ using Entities = Kwotty.Data.Entities;
 
 namespace Kwotty.Infrastructure.Mappers;
 
-public class AccessTokenMapper : IMapper<Models.AceessToken, Entities.AccessToken>
+public class AccessTokenMapper : IMapper<Models.AccessToken, Entities.AccessToken>
 {
-    public Models.AceessToken? ToModel(Entities.AccessToken? entity)
+    public Models.AccessToken? ToModel(Entities.AccessToken? entity)
     {
         if (entity == null) return null;
 
-        return new Models.AceessToken
+        return new Models.AccessToken
         {
             Id = entity.Id,
             TokenValue = entity.TokenValue,
@@ -23,12 +23,12 @@ public class AccessTokenMapper : IMapper<Models.AceessToken, Entities.AccessToke
         };
     }
 
-    public IEnumerable<Models.AceessToken> ToModelList(IEnumerable<Entities.AccessToken>? entities)
+    public IEnumerable<Models.AccessToken> ToModelList(IEnumerable<Entities.AccessToken>? entities)
     {
-        return entities?.Select(ToModel).Where(d => d != null).ToList() ?? Enumerable.Empty<Models.AceessToken>();
+        return entities?.Select(ToModel).Where(d => d != null).ToList() ?? Enumerable.Empty<Models.AccessToken>();
     }
 
-    public Entities.AccessToken? ToNewEntity(Models.AceessToken? model)
+    public Entities.AccessToken? ToNewEntity(Models.AccessToken? model)
     {
         if (model == null) return null;
 
@@ -43,7 +43,7 @@ public class AccessTokenMapper : IMapper<Models.AceessToken, Entities.AccessToke
         };
     }
 
-    public void ApplyUpdate(Models.AceessToken domain, Entities.AccessToken entity)
+    public void ApplyUpdate(Models.AccessToken domain, Entities.AccessToken entity)
     {
         ArgumentNullException.ThrowIfNull(domain);
         ArgumentNullException.ThrowIfNull(entity);

@@ -1,6 +1,6 @@
 ﻿namespace Kwotty.Domain.Models;
 
-public class AceessToken
+public class AccessToken
 {
     public int Id { get; set; }
 

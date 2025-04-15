@@ -34,7 +34,7 @@ public static class DependencyInjection
             }
         }
 
-        services.AddScoped<IGenericRepo<Models.AceessToken, int>, GenericRepo<Models.AceessToken, Entities.AccessToken, int>>();
+        services.AddScoped<IGenericRepo<Models.AccessToken, int>, GenericRepo<Models.AccessToken, Entities.AccessToken, int>>();
         services.AddScoped<IGenericRepo<Models.Author, Guid>, GenericRepo<Models.Author, Entities.Author, Guid>>();
         services.AddScoped<IGenericRepo<Models.Category, Guid>, GenericRepo<Models.Category, Entities.Category, Guid>>();
         services.AddScoped<IGenericRepo<Models.Medium, Guid>, GenericRepo<Models.Medium, Entities.Medium, Guid>>();
