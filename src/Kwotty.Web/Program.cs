@@ -1,5 +1,6 @@
 using Kwotty.Data;
 using Kwotty.Data.Configuration;
+using Kwotty.Infrastructure.Configuration;
 using Kwotty.Web.EndPoints.Authentication;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -7,6 +8,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddRazorPages();
 builder.Services.AddSwaggerGen();
+builder.Services.AddInfrastructureServices();
 builder.Services.AddDatabase(builder.Configuration);
 
 var app = builder.Build();
