@@ -47,6 +47,11 @@ public class QuoteMapper : IMapper<Models.Quote, Entities.Quote>
                                      .OrderBy(i => i.SortNumber)
                                      .ToList();
 
+        var categoriesModel = entity.QuoteCategories
+            .Select(qc => _categoryMapper.ToModel(qc.Category)) // Map the Category part
+            .Where(c => c != null)
+            .ToList();
+
         // Create Model object
         var quoteModel = new Models.Quote(
             entity.Id,
@@ -54,19 +59,20 @@ public class QuoteMapper : IMapper<Models.Quote, Entities.Quote>
             entity.IsHidden,
             entity.CreatedOnUtc,
             entity.CreatedBy,
-            itemsModel
+            itemsModel,
+            categoriesModel
         );
 
         // Map Categories (from join table)
-        if (entity.QuoteCategories != null)
-        {
-            var categoriesModel = entity.QuoteCategories
-                .Select(qc => _categoryMapper.ToModel(qc.Category)) // Map the Category part
-                .Where(c => c != null)
-                .ToList();
+        //if (entity.QuoteCategories != null)
+        //{
+        //    var categoriesModel = entity.QuoteCategories
+        //        .Select(qc => _categoryMapper.ToModel(qc.Category)) // Map the Category part
+        //        .Where(c => c != null)
+        //        .ToList();
 
-            if (categoriesModel.Any()) quoteModel.SetInitialCategories(categoriesModel!); // Use internal setter
-        }
+        //    if (categoriesModel.Any()) quoteModel.SetInitialCategories(categoriesModel!); // Use internal setter
+        //}
 
         // Map Ratings (from join table)
         if (entity.QuoteRatings != null)

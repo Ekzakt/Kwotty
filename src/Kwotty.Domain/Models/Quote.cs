@@ -6,7 +6,7 @@
 /// </summary>
 public class Quote
 {
-    private readonly List<QuoteItem> _items = [];
+    private readonly List<QuoteItem> _quoteItems = [];
 
 	private readonly List<Category> _categories = [];
 
@@ -19,34 +19,37 @@ public class Quote
 
     public DateTimeOffset CreatedOnUtc { get; }
 
-    public string? CreatedBy { get; }
+    public string CreatedBy { get; }
 
     public Author Author { get; private set; }
 
-    public IReadOnlyList<QuoteItem> Items => _items.AsReadOnly();
+    public IReadOnlyList<QuoteItem> Items => _quoteItems.AsReadOnly();
 
     public IReadOnlyList<Category> Categories => _categories.AsReadOnly();
 
     public IReadOnlyList<Rating> Ratings => _ratings.AsReadOnly();
 
 
-    public Quote(Guid id, Author author, bool isHidden, DateTimeOffset createdOnUtc, string? createdBy, IEnumerable<QuoteItem>? initialItems = null)
+    public Quote(Guid id, Author author, bool isHidden, DateTimeOffset createdOnUtc, string createdBy, IEnumerable<QuoteItem> quoteItems, IEnumerable<Category> categories)
     {
         Id = id;
         Author = author ?? throw new ArgumentNullException(nameof(author));
         IsHidden = isHidden;
         CreatedOnUtc = createdOnUtc;
         CreatedBy = createdBy;
-
-        if (initialItems != null)
-        {
-            _items.AddRange(initialItems);
-        }
+        _quoteItems.AddRange(quoteItems);
+        _categories.AddRange(categories);
     }
+
 
 	public void Hide() => IsHidden = true;
 
+
 	public void Show() => IsHidden = false;
+
+
+    public void UpdateVisibility(bool isVisible) => IsHidden = !isVisible;
+
 
 	public void ChangeAuthor(Author newAuthor)
     {
@@ -66,14 +69,14 @@ public class Quote
     public void AddItem(Guid itemId, string? text, string? textSlug, int sortNumber, Medium? associatedMedium = null)
     {
         // Add validation (e.g., unique sortNumber?)
-        _items.Add(new QuoteItem(itemId, text, textSlug, sortNumber, associatedMedium));
-        _items.Sort((x, y) => x.SortNumber.CompareTo(y.SortNumber)); // Maintain sort order
+        _quoteItems.Add(new QuoteItem(itemId, text, textSlug, sortNumber, associatedMedium));
+        _quoteItems.Sort((x, y) => x.SortNumber.CompareTo(y.SortNumber)); // Maintain sort order
     }
 
 
     public void RemoveItem(Guid itemId)
     {
-        _items.RemoveAll(item => item.Id == itemId);
+        _quoteItems.RemoveAll(item => item.Id == itemId);
     }
 
 
@@ -93,12 +96,14 @@ public class Quote
         }
     }
 
+
     public void RemoveRating(User user)
     {
         ArgumentNullException.ThrowIfNull(user);
 
         _ratings.RemoveAll(r => r.UserId == user.Id);
     }
+
 
 	public void SetInitialCategories(IEnumerable<Category> categories)
 	{
